@@ -28,7 +28,10 @@ return;
 
 bot.sendMessage(
 chatId,
-"📊 Você enviou:\n${texto}\n\nA IA analisará este conteúdo em breve."
+`📊 Você enviou:
+${texto}
+
+A IA analisará este conteúdo em breve.`
 );
 });
 
