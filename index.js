@@ -1,6 +1,7 @@
-import express from "express";
 import TelegramBot from "node-telegram-bot-api";
+import express from "express";
 import dotenv from "dotenv";
+
 import { buscarOdds } from "./services/oddsService.js";
 
 dotenv.config();
@@ -15,77 +16,61 @@ const bot = new TelegramBot(process.env.BOT_TOKEN, {
 
 function normalizarTexto(texto) {
   return texto
-    .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-}
-
-function analisarJogo(market) {
-  if (!market || !market.outcomes) {
-    return {
-      favorito: "Indefinido",
-      risco: "Desconhecido",
-    };
-  }
-
-  const oddsOrdenadas = [...market.outcomes].sort(
-    (a, b) => a.price - b.price
-  );
-
-  const favorito = oddsOrdenadas[0];
-
-  let risco = "Alto";
-
-  if (favorito.price <= 1.50) {
-    risco = "Baixo";
-  } else if (favorito.price <= 2.00) {
-    risco = "Médio";
-  }
-
-  return {
-    favorito: favorito.name,
-    oddFavorita: favorito.price,
-    risco,
-  };
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
 }
 
 bot.on("message", async (msg) => {
-  const chatId = msg.chat.id;
-  const texto = msg.text?.trim();
-
-  console.log("Mensagem recebida:", texto);
-
-  if (!texto) return;
-
-  if (texto === "/start") {
-    bot.sendMessage(
-      chatId,
-      `🚀 Bem-vindo ao AnaliseBet IA!
-
-🌎 Cobertura global de odds e análises esportivas.
-
-Envie:
-• Nome de time
-• Liga
-• Campeonato
-• Ou confronto
-
-Exemplos:
-Flamengo
-NBA
-Champions
-La Liga
-Real Madrid`
-    );
-
-    return;
-  }
-
   try {
+    const chatId = msg.chat.id;
+
+    const texto = msg.text || "";
+
+    console.log("Mensagem recebida:", texto);
+
+    if (texto === "/start") {
+      await bot.sendMessage(
+        chatId,
+        "🚀 Bem-vindo ao AnaliseBet IA!\n\nEnvie jogos, times ou ligas para análise."
+      );
+
+      return;
+    }
+
+    if (texto.length < 2) {
+      await bot.sendMessage(
+        chatId,
+        "⚠️ Digite um jogo, time ou liga válida."
+      );
+
+      return;
+    }
+
     const odds = await buscarOdds();
 
-    if (!odds || odds.length === 0) {
-      bot.sendMessage(
+    console.log("Total jogos encontrados:", odds.length);
+
+    const busca = normalizarTexto(texto);
+
+    const encontrados = odds.filter((jogo) => {
+      const home = normalizarTexto(jogo.home_team || "");
+      const away = normalizarTexto(jogo.away_team || "");
+      const liga = normalizarTexto(jogo.sport_title || "");
+
+      return (
+        home.includes(busca) ||
+        away.includes(busca) ||
+        liga.includes(busca) ||
+        `${home} x ${away}`.includes(busca)
+      );
+    });
+
+    console.log("Jogos filtrados:", encontrados.length);
+
+    if (encontrados.length === 0) {
+      await bot.sendMessage(
         chatId,
         "❌ Nenhum jogo encontrado agora."
       );
@@ -93,78 +78,59 @@ Real Madrid`
       return;
     }
 
-    const busca = normalizarTexto(texto);
+    let resposta = `📊 Jogos encontrados (${encontrados.length})\n\n`;
 
-    const jogosFiltrados = odds.filter((jogo) => {
-      const liga = normalizarTexto(
-        jogo.sport_title || ""
-      );
+    encontrados.slice(0, 5).forEach((jogo) => {
+      const bookmaker = jogo.bookmakers?.[0];
 
-      const casa = normalizarTexto(
-        jogo.home_team || ""
-      );
+      if (!bookmaker) return;
 
-      const fora = normalizarTexto(
-        jogo.away_team || ""
-      );
+      const market = bookmaker.markets?.[0];
 
-      const confronto = `${casa} x ${fora}`;
+      if (!market) return;
 
-      return (
-        liga.includes(busca) ||
-        casa.includes(busca) ||
-        fora.includes(busca) ||
-        confronto.includes(busca)
-      );
-    });
-
-    if (jogosFiltrados.length === 0) {
-      bot.sendMessage(
-        chatId,
-        "❌ Não encontrei jogos relacionados."
-      );
-
-      return;
-    }
-
-    let resposta = `📊 Jogos encontrados (${jogosFiltrados.length})\n\n`;
-
-    jogosFiltrados.slice(0, 5).forEach((jogo) => {
       resposta += `⚽ ${jogo.home_team} x ${jogo.away_team}\n`;
       resposta += `🏆 ${jogo.sport_title}\n`;
 
-      const bookmaker = jogo.bookmakers?.[0];
+      market.outcomes.forEach((outcome) => {
+        resposta += `• ${outcome.name}: ${outcome.price}\n`;
+      });
 
-      if (bookmaker) {
-        const market = bookmaker.markets?.find(
-          (m) => m.key === "h2h"
-        );
+      const favorito = market.outcomes.reduce((menor, atual) =>
+        atual.price < menor.price ? atual : menor
+      );
 
-        if (market) {
-          market.outcomes.forEach((odd) => {
-            resposta += `• ${odd.name}: ${odd.price}\n`;
-          });
+      let risco = "Alto";
 
-          const analise = analisarJogo(market);
-
-          resposta += `\n🧠 Análise IA:\n`;
-          resposta += `⭐ Favorito: ${analise.favorito}\n`;
-          resposta += `📉 Odd favorita: ${analise.oddFavorita}\n`;
-          resposta += `⚠️ Risco: ${analise.risco}\n`;
-        }
+      if (favorito.price <= 1.70) {
+        risco = "Baixo";
+      } else if (favorito.price <= 2.20) {
+        risco = "Médio";
       }
+
+      resposta += `\n🧠 Análise IA:\n`;
+      resposta += `⭐ Favorito: ${favorito.name}\n`;
+      resposta += `📉 Odd favorita: ${favorito.price}\n`;
+      resposta += `⚠️ Risco: ${risco}\n`;
 
       resposta += `\n━━━━━━━━━━━━━━\n\n`;
     });
 
-    bot.sendMessage(chatId, resposta);
-  } catch (error) {
-    console.log("Erro geral:", error.message);
+    if (resposta.length > 4000) {
+      resposta = resposta.slice(0, 3900);
+    }
 
-    bot.sendMessage(
-      chatId,
-      "❌ Erro ao processar busca."
-    );
+    await bot.sendMessage(chatId, resposta);
+  } catch (error) {
+    console.log("ERRO GERAL BOT:");
+    console.log(error);
+
+    try {
+      await bot.sendMessage(
+        msg.chat.id,
+        "❌ Erro interno ao buscar jogos."
+      );
+    } catch {}
   }
 });
 
