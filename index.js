@@ -19,23 +19,39 @@ bot.on("message", async (msg) => {
 
   console.log("Mensagem recebida:", texto);
 
-  if (!texto) {
-    return;
-  }
+  if (!texto) return;
 
   if (texto === "/start") {
     bot.sendMessage(
       chatId,
-      "🚀 Bem-vindo ao AnaliseBet IA!\n\nEnvie um jogo de futebol para análise.\n\nExemplo:\nPalmeiras x Flamengo"
-    );
-    return;
-  }
+      `🚀 Bem-vindo ao AnaliseBet IA!
 
-  if (texto.length < 5) {
-    bot.sendMessage(
-      chatId,
-      "⚠️ Digite um jogo válido.\n\nExemplo:\nPalmeiras x Flamengo"
+🌎 Cobertura:
+• Brasileirão
+• Premier League
+• La Liga
+• Serie A
+• Bundesliga
+• Ligue 1
+• Champions League
+• NBA
+• Tênis
+
+Envie:
+• Nome de time
+• Liga
+• Campeonato
+• Ou confronto
+
+Exemplos:
+Palmeiras
+Flamengo
+Premier League
+NBA
+Real Madrid
+Manchester City`
     );
+
     return;
   }
 
@@ -45,22 +61,21 @@ bot.on("message", async (msg) => {
     if (!odds || odds.length === 0) {
       bot.sendMessage(
         chatId,
-        "❌ Nenhum jogo encontrado."
+        "❌ Nenhum jogo encontrado agora."
       );
+
       return;
     }
 
     const busca = texto.toLowerCase();
 
     const jogosFiltrados = odds.filter((jogo) => {
-      if (jogo.sport_key !== "soccer") {
-        return false;
-      }
-
+      const liga = jogo.sport_title?.toLowerCase() || "";
       const casa = jogo.home_team?.toLowerCase() || "";
       const fora = jogo.away_team?.toLowerCase() || "";
 
       return (
+        liga.includes(busca) ||
         casa.includes(busca) ||
         fora.includes(busca) ||
         `${casa} x ${fora}`.includes(busca)
@@ -70,23 +85,27 @@ bot.on("message", async (msg) => {
     if (jogosFiltrados.length === 0) {
       bot.sendMessage(
         chatId,
-        "❌ Não encontrei esse jogo nas odds disponíveis agora."
+        "❌ Não encontrei jogos relacionados."
       );
+
       return;
     }
 
-    let resposta = "📊 Análise encontrada:\n\n";
+    let resposta = `📊 Jogos encontrados (${jogosFiltrados.length})\n\n`;
 
-    jogosFiltrados.slice(0, 3).forEach((jogo) => {
-      resposta += `⚽ ${jogo.home_team} x ${jogo.away_team}\n\n`;
+    jogosFiltrados.slice(0, 10).forEach((jogo) => {
+      resposta += `⚽ ${jogo.home_team} x ${jogo.away_team}\n`;
+      resposta += `🏆 ${jogo.sport_title}\n`;
 
       const bookmaker = jogo.bookmakers?.[0];
 
       if (bookmaker) {
-        const mercados = bookmaker.markets?.[0];
+        const mercado = bookmaker.markets?.find(
+          (m) => m.key === "h2h"
+        );
 
-        if (mercados) {
-          mercados.outcomes.forEach((odd) => {
+        if (mercado) {
+          mercado.outcomes.forEach((odd) => {
             resposta += `• ${odd.name}: ${odd.price}\n`;
           });
         }
@@ -101,7 +120,7 @@ bot.on("message", async (msg) => {
 
     bot.sendMessage(
       chatId,
-      "❌ Erro ao processar análise."
+      "❌ Erro ao processar busca."
     );
   }
 });
