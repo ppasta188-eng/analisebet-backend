@@ -4,22 +4,48 @@ const API_KEY = process.env.ODDS_API_KEY;
 
 export async function buscarOdds() {
   try {
-    const response = await axios.get(
-      "https://api.the-odds-api.com/v4/sports/upcoming/odds",
-      {
-        params: {
-          apiKey: API_KEY,
-          regions: "eu",
-          markets: "h2h",
-          oddsFormat: "decimal",
-        },
-      }
-    );
+    const esportes = [
+      "soccer_brazil_campeonato",
+      "soccer_epl",
+      "soccer_spain_la_liga",
+      "soccer_italy_serie_a",
+      "soccer_germany_bundesliga",
+      "soccer_france_ligue_one",
+      "soccer_uefa_champs_league",
+      "basketball_nba",
+      "basketball_ncaab",
+      "tennis_atp_french_open",
+    ];
 
-    return response.data;
+    let todosJogos = [];
+
+    for (const esporte of esportes) {
+      try {
+        const response = await axios.get(
+          `https://api.the-odds-api.com/v4/sports/${esporte}/odds`,
+          {
+            params: {
+              apiKey: API_KEY,
+              regions: "us,uk,eu",
+              markets: "h2h",
+              oddsFormat: "decimal",
+            },
+          }
+        );
+
+        todosJogos = [...todosJogos, ...response.data];
+      } catch (erroInterno) {
+        console.log(
+          `Erro ao buscar ${esporte}:`,
+          erroInterno.response?.status
+        );
+      }
+    }
+
+    return todosJogos;
   } catch (error) {
     console.log(
-      "Erro ao buscar odds:",
+      "Erro geral odds:",
       error.response?.data || error.message
     );
 
