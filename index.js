@@ -15,14 +15,26 @@ const bot = new TelegramBot(process.env.BOT_TOKEN, {
 
 bot.on("message", async (msg) => {
   const chatId = msg.chat.id;
-  const texto = msg.text;
+  const texto = msg.text?.trim();
 
   console.log("Mensagem recebida:", texto);
+
+  if (!texto) {
+    return;
+  }
 
   if (texto === "/start") {
     bot.sendMessage(
       chatId,
-      "🚀 Bem-vindo ao AnaliseBet IA!\n\nEnvie jogos para análise."
+      "🚀 Bem-vindo ao AnaliseBet IA!\n\nEnvie um jogo de futebol para análise.\n\nExemplo:\nPalmeiras x Flamengo"
+    );
+    return;
+  }
+
+  if (texto.length < 5) {
+    bot.sendMessage(
+      chatId,
+      "⚠️ Digite um jogo válido.\n\nExemplo:\nPalmeiras x Flamengo"
     );
     return;
   }
@@ -31,13 +43,20 @@ bot.on("message", async (msg) => {
     const odds = await buscarOdds();
 
     if (!odds || odds.length === 0) {
-      bot.sendMessage(chatId, "❌ Nenhum jogo encontrado.");
+      bot.sendMessage(
+        chatId,
+        "❌ Nenhum jogo encontrado."
+      );
       return;
     }
 
     const busca = texto.toLowerCase();
 
     const jogosFiltrados = odds.filter((jogo) => {
+      if (jogo.sport_key !== "soccer") {
+        return false;
+      }
+
       const casa = jogo.home_team?.toLowerCase() || "";
       const fora = jogo.away_team?.toLowerCase() || "";
 
@@ -56,10 +75,10 @@ bot.on("message", async (msg) => {
       return;
     }
 
-    let resposta = "📊 Jogos encontrados:\n\n";
+    let resposta = "📊 Análise encontrada:\n\n";
 
-    jogosFiltrados.slice(0, 5).forEach((jogo) => {
-      resposta += `⚽ ${jogo.home_team} x ${jogo.away_team}\n`;
+    jogosFiltrados.slice(0, 3).forEach((jogo) => {
+      resposta += `⚽ ${jogo.home_team} x ${jogo.away_team}\n\n`;
 
       const bookmaker = jogo.bookmakers?.[0];
 
