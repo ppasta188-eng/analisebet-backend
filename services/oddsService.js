@@ -1,26 +1,21 @@
 import axios from "axios";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const API_KEY = process.env.ODDS_API_KEY;
 
 export async function buscarOdds() {
   try {
     const esportes = [
-      // BRASIL
       "soccer_brazil_campeonato",
-
-      // INTERNACIONAIS
-      "soccer_epl",
+      "soccer_conmebol_libertadores",
+      "soccer_uefa_champs_league",
       "soccer_spain_la_liga",
+      "soccer_epl",
       "soccer_italy_serie_a",
       "soccer_germany_bundesliga",
       "soccer_france_ligue_one",
-
-      // COPAS
-      "soccer_uefa_champs_league",
-      "soccer_conmebol_libertadores",
-      "soccer_conmebol_sudamericana",
-
-      // OUTROS
       "basketball_nba",
     ];
 
@@ -28,29 +23,33 @@ export async function buscarOdds() {
 
     for (const esporte of esportes) {
       try {
+        console.log("Buscando:", esporte);
+
         const response = await axios.get(
           `https://api.the-odds-api.com/v4/sports/${esporte}/odds`,
           {
             params: {
               apiKey: API_KEY,
-              regions: "us,uk,eu",
+              regions: "us,uk,eu,br",
               markets: "h2h",
               oddsFormat: "decimal",
             },
           }
         );
 
-        const agora = new Date();
+        console.log(
+          `Jogos encontrados ${esporte}:`,
+          response.data.length
+        );
 
-        const jogosFuturos = response.data.filter((jogo) => {
-          return new Date(jogo.commence_time) > agora;
-        });
-
-        todosJogos = [...todosJogos, ...jogosFuturos];
+        todosJogos = [
+          ...todosJogos,
+          ...response.data,
+        ];
       } catch (erroInterno) {
         console.log(
-          `Erro ao buscar ${esporte}:`,
-          erroInterno.response?.status
+          `Erro no esporte ${esporte}:`,
+          erroInterno.response?.data || erroInterno.message
         );
       }
     }
