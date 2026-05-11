@@ -13,8 +13,6 @@ export async function buscarOdds() {
       "soccer_france_ligue_one",
       "soccer_uefa_champs_league",
       "basketball_nba",
-      "basketball_ncaab",
-      "tennis_atp_french_open",
     ];
 
     let todosJogos = [];
@@ -33,7 +31,13 @@ export async function buscarOdds() {
           }
         );
 
-        todosJogos = [...todosJogos, ...response.data];
+        const agora = new Date();
+
+        const jogosFuturos = response.data.filter((jogo) => {
+          return new Date(jogo.commence_time) > agora;
+        });
+
+        todosJogos = [...todosJogos, ...jogosFuturos];
       } catch (erroInterno) {
         console.log(
           `Erro ao buscar ${esporte}:`,
