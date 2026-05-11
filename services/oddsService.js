@@ -5,7 +5,7 @@ const API_KEY = process.env.ODDS_API_KEY;
 export async function buscarOdds() {
   try {
     const response = await axios.get(
-      "https://api.the-odds-api.com/v4/sports/soccer/odds",
+      "https://api.the-odds-api.com/v4/sports/upcoming/odds",
       {
         params: {
           apiKey: API_KEY,
