@@ -13,6 +13,13 @@ const bot = new TelegramBot(process.env.BOT_TOKEN, {
   polling: true,
 });
 
+function normalizarTexto(texto) {
+  return texto
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
 bot.on("message", async (msg) => {
   const chatId = msg.chat.id;
   const texto = msg.text?.trim();
@@ -28,14 +35,14 @@ bot.on("message", async (msg) => {
 
 🌎 Cobertura:
 • Brasileirão
+• Libertadores
+• Champions League
 • Premier League
 • La Liga
 • Serie A
 • Bundesliga
 • Ligue 1
-• Champions League
 • NBA
-• Tênis
 
 Envie:
 • Nome de time
@@ -46,10 +53,12 @@ Envie:
 Exemplos:
 Palmeiras
 Flamengo
-Premier League
-NBA
+Bahia
+Libertadores
+Champions
+La Liga
 Real Madrid
-Manchester City`
+NBA`
     );
 
     return;
@@ -67,18 +76,28 @@ Manchester City`
       return;
     }
 
-    const busca = texto.toLowerCase();
+    const busca = normalizarTexto(texto);
 
     const jogosFiltrados = odds.filter((jogo) => {
-      const liga = jogo.sport_title?.toLowerCase() || "";
-      const casa = jogo.home_team?.toLowerCase() || "";
-      const fora = jogo.away_team?.toLowerCase() || "";
+      const liga = normalizarTexto(
+        jogo.sport_title || ""
+      );
+
+      const casa = normalizarTexto(
+        jogo.home_team || ""
+      );
+
+      const fora = normalizarTexto(
+        jogo.away_team || ""
+      );
+
+      const confronto = `${casa} x ${fora}`;
 
       return (
         liga.includes(busca) ||
         casa.includes(busca) ||
         fora.includes(busca) ||
-        `${casa} x ${fora}`.includes(busca)
+        confronto.includes(busca)
       );
     });
 
