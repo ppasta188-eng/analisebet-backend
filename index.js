@@ -1,6 +1,7 @@
 import express from "express";
 import TelegramBot from "node-telegram-bot-api";
 import dotenv from "dotenv";
+import { buscarOdds } from "./services/oddsService.js";
 
 dotenv.config();
 
@@ -21,18 +22,30 @@ bot.on("message", async (msg) => {
   if (texto === "/start") {
     bot.sendMessage(
       chatId,
-      "🚀 Bem-vindo ao AnaliseBet IA!\n\nEnvie prints de apostas ou jogos para análise."
+      "🚀 Bem-vindo ao AnaliseBet IA!\n\nEnvie jogos para análise."
     );
+
     return;
   }
 
-  bot.sendMessage(
-    chatId,
-    `📊 Você enviou:
-${texto}
+  const odds = await buscarOdds();
 
-A IA analisará este conteúdo em breve.`
-  );
+  if (!odds.length) {
+    bot.sendMessage(
+      chatId,
+      "❌ Não foi possível buscar odds agora."
+    );
+
+    return;
+  }
+
+  let resposta = "📊 Jogos encontrados:\n\n";
+
+  odds.slice(0, 5).forEach((jogo) => {
+    resposta += `⚽ ${jogo.home_team} x ${jogo.away_team}\n`;
+  });
+
+  bot.sendMessage(chatId, resposta);
 });
 
 app.get("/", (req, res) => {
