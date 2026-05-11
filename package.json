@@ -1,15 +1,15 @@
 {
-"name": "analisebet-backend",
-"version": "1.0.0",
-"main": "index.js",
-"type": "module",
-"scripts": {
-"start": "node index.js"
-},
-"dependencies": {
-"axios": "^1.8.4",
-"dotenv": "^16.5.0",
-"express": "^5.1.0",
-"node-telegram-bot-api": "^0.66.0"
-}
+  "name": "analisebet-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.2",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "node-telegram-bot-api": "^0.66.0"
+  }
 }
