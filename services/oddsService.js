@@ -5,13 +5,22 @@ const API_KEY = process.env.ODDS_API_KEY;
 export async function buscarOdds() {
   try {
     const esportes = [
+      // BRASIL
       "soccer_brazil_campeonato",
+
+      // INTERNACIONAIS
       "soccer_epl",
       "soccer_spain_la_liga",
       "soccer_italy_serie_a",
       "soccer_germany_bundesliga",
       "soccer_france_ligue_one",
+
+      // COPAS
       "soccer_uefa_champs_league",
+      "soccer_conmebol_libertadores",
+      "soccer_conmebol_sudamericana",
+
+      // OUTROS
       "basketball_nba",
     ];
 
