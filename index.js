@@ -7,7 +7,9 @@ const app = express();
 
 const PORT = process.env.PORT || 10000;
 
-const bot = new TelegramBot(process.env.TELEGRAM_TOKEN, {
+const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+
+const bot = new TelegramBot(TOKEN, {
   polling: true
 });
 
