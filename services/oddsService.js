@@ -1,66 +1,106 @@
-import axios from "axios";
-import dotenv from "dotenv";
-
-dotenv.config();
+const axios = require("axios");
 
 const API_KEY = process.env.ODDS_API_KEY;
 
-export async function buscarOdds() {
+function normalizeText(text) {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
+async function buscarEsportes() {
   try {
-    const esportes = [
-      "soccer_brazil_campeonato",
-      "soccer_conmebol_libertadores",
-      "soccer_uefa_champs_league",
-      "soccer_spain_la_liga",
-      "soccer_epl",
-      "soccer_italy_serie_a",
-      "soccer_germany_bundesliga",
-      "soccer_france_ligue_one",
-      "basketball_nba",
-    ];
-
-    let todosJogos = [];
-
-    for (const esporte of esportes) {
-      try {
-        console.log("Buscando:", esporte);
-
-        const response = await axios.get(
-          `https://api.the-odds-api.com/v4/sports/${esporte}/odds`,
-          {
-            params: {
-              apiKey: API_KEY,
-              regions: "us,uk,eu,br",
-              markets: "h2h",
-              oddsFormat: "decimal",
-            },
-          }
-        );
-
-        console.log(
-          `Jogos encontrados ${esporte}:`,
-          response.data.length
-        );
-
-        todosJogos = [
-          ...todosJogos,
-          ...response.data,
-        ];
-      } catch (erroInterno) {
-        console.log(
-          `Erro no esporte ${esporte}:`,
-          erroInterno.response?.data || erroInterno.message
-        );
+    const response = await axios.get(
+      "https://api.the-odds-api.com/v4/sports",
+      {
+        params: {
+          apiKey: API_KEY
+        }
       }
-    }
-
-    return todosJogos;
-  } catch (error) {
-    console.log(
-      "Erro geral odds:",
-      error.response?.data || error.message
     );
 
+    return response.data;
+
+  } catch (error) {
+    console.log("Erro esportes:", error.message);
     return [];
   }
 }
+
+async function buscarOddsPorEsporte(sportKey) {
+  try {
+    const response = await axios.get(
+      `https://api.the-odds-api.com/v4/sports/${sportKey}/odds`,
+      {
+        params: {
+          apiKey: API_KEY,
+          regions: "eu,us,uk,br",
+          markets: "h2h",
+          oddsFormat: "decimal"
+        }
+      }
+    );
+
+    return response.data;
+
+  } catch (error) {
+    return [];
+  }
+}
+
+async function buscarJogos(query) {
+
+  const termo = normalizeText(query);
+
+  const esportes = await buscarEsportes();
+
+  const esportesFiltrados = esportes.filter((e) => {
+
+    const title = normalizeText(e.title || "");
+    const description = normalizeText(e.description || "");
+    const key = normalizeText(e.key || "");
+
+    return (
+      title.includes("soccer") ||
+      description.includes("soccer") ||
+      key.includes("soccer") ||
+      title.includes("football")
+    );
+  });
+
+  let todosJogos = [];
+
+  for (const esporte of esportesFiltrados) {
+
+    const jogos = await buscarOddsPorEsporte(esporte.key);
+
+    todosJogos.push(...jogos);
+  }
+
+  const encontrados = todosJogos.filter((jogo) => {
+
+    const home = normalizeText(jogo.home_team || "");
+
+    const away = normalizeText(
+      jogo.away_team ||
+      jogo.teams?.find((t) => t !== jogo.home_team) ||
+      ""
+    );
+
+    const sport = normalizeText(jogo.sport_title || "");
+
+    return (
+      home.includes(termo) ||
+      away.includes(termo) ||
+      sport.includes(termo)
+    );
+  });
+
+  return encontrados;
+}
+
+module.exports = {
+  buscarJogos
+};
