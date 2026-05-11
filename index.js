@@ -20,6 +20,35 @@ function normalizarTexto(texto) {
     .replace(/[\u0300-\u036f]/g, "");
 }
 
+function analisarJogo(market) {
+  if (!market || !market.outcomes) {
+    return {
+      favorito: "Indefinido",
+      risco: "Desconhecido",
+    };
+  }
+
+  const oddsOrdenadas = [...market.outcomes].sort(
+    (a, b) => a.price - b.price
+  );
+
+  const favorito = oddsOrdenadas[0];
+
+  let risco = "Alto";
+
+  if (favorito.price <= 1.50) {
+    risco = "Baixo";
+  } else if (favorito.price <= 2.00) {
+    risco = "Médio";
+  }
+
+  return {
+    favorito: favorito.name,
+    oddFavorita: favorito.price,
+    risco,
+  };
+}
+
 bot.on("message", async (msg) => {
   const chatId = msg.chat.id;
   const texto = msg.text?.trim();
@@ -33,16 +62,7 @@ bot.on("message", async (msg) => {
       chatId,
       `🚀 Bem-vindo ao AnaliseBet IA!
 
-🌎 Cobertura:
-• Brasileirão
-• Libertadores
-• Champions League
-• Premier League
-• La Liga
-• Serie A
-• Bundesliga
-• Ligue 1
-• NBA
+🌎 Cobertura global de odds e análises esportivas.
 
 Envie:
 • Nome de time
@@ -51,14 +71,11 @@ Envie:
 • Ou confronto
 
 Exemplos:
-Palmeiras
 Flamengo
-Bahia
-Libertadores
+NBA
 Champions
 La Liga
-Real Madrid
-NBA`
+Real Madrid`
     );
 
     return;
@@ -112,25 +129,32 @@ NBA`
 
     let resposta = `📊 Jogos encontrados (${jogosFiltrados.length})\n\n`;
 
-    jogosFiltrados.slice(0, 10).forEach((jogo) => {
+    jogosFiltrados.slice(0, 5).forEach((jogo) => {
       resposta += `⚽ ${jogo.home_team} x ${jogo.away_team}\n`;
       resposta += `🏆 ${jogo.sport_title}\n`;
 
       const bookmaker = jogo.bookmakers?.[0];
 
       if (bookmaker) {
-        const mercado = bookmaker.markets?.find(
+        const market = bookmaker.markets?.find(
           (m) => m.key === "h2h"
         );
 
-        if (mercado) {
-          mercado.outcomes.forEach((odd) => {
+        if (market) {
+          market.outcomes.forEach((odd) => {
             resposta += `• ${odd.name}: ${odd.price}\n`;
           });
+
+          const analise = analisarJogo(market);
+
+          resposta += `\n🧠 Análise IA:\n`;
+          resposta += `⭐ Favorito: ${analise.favorito}\n`;
+          resposta += `📉 Odd favorita: ${analise.oddFavorita}\n`;
+          resposta += `⚠️ Risco: ${analise.risco}\n`;
         }
       }
 
-      resposta += "\n";
+      resposta += `\n━━━━━━━━━━━━━━\n\n`;
     });
 
     bot.sendMessage(chatId, resposta);
