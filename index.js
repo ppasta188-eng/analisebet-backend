@@ -24,28 +24,67 @@ bot.on("message", async (msg) => {
       chatId,
       "🚀 Bem-vindo ao AnaliseBet IA!\n\nEnvie jogos para análise."
     );
-
     return;
   }
 
-  const odds = await buscarOdds();
+  try {
+    const odds = await buscarOdds();
 
-  if (!odds.length) {
+    if (!odds || odds.length === 0) {
+      bot.sendMessage(chatId, "❌ Nenhum jogo encontrado.");
+      return;
+    }
+
+    const busca = texto.toLowerCase();
+
+    const jogosFiltrados = odds.filter((jogo) => {
+      const casa = jogo.home_team?.toLowerCase() || "";
+      const fora = jogo.away_team?.toLowerCase() || "";
+
+      return (
+        casa.includes(busca) ||
+        fora.includes(busca) ||
+        `${casa} x ${fora}`.includes(busca)
+      );
+    });
+
+    if (jogosFiltrados.length === 0) {
+      bot.sendMessage(
+        chatId,
+        "❌ Não encontrei esse jogo nas odds disponíveis agora."
+      );
+      return;
+    }
+
+    let resposta = "📊 Jogos encontrados:\n\n";
+
+    jogosFiltrados.slice(0, 5).forEach((jogo) => {
+      resposta += `⚽ ${jogo.home_team} x ${jogo.away_team}\n`;
+
+      const bookmaker = jogo.bookmakers?.[0];
+
+      if (bookmaker) {
+        const mercados = bookmaker.markets?.[0];
+
+        if (mercados) {
+          mercados.outcomes.forEach((odd) => {
+            resposta += `• ${odd.name}: ${odd.price}\n`;
+          });
+        }
+      }
+
+      resposta += "\n";
+    });
+
+    bot.sendMessage(chatId, resposta);
+  } catch (error) {
+    console.log("Erro geral:", error.message);
+
     bot.sendMessage(
       chatId,
-      "❌ Não foi possível buscar odds agora."
+      "❌ Erro ao processar análise."
     );
-
-    return;
   }
-
-  let resposta = "📊 Jogos encontrados:\n\n";
-
-  odds.slice(0, 5).forEach((jogo) => {
-    resposta += `⚽ ${jogo.home_team} x ${jogo.away_team}\n`;
-  });
-
-  bot.sendMessage(chatId, resposta);
 });
 
 app.get("/", (req, res) => {
