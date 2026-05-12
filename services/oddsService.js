@@ -4,13 +4,13 @@ const API_KEY = process.env.ODDS_API_KEY;
 
 const SPORTS = [
   "soccer_brazil_campeonato",
+  "soccer_brazil_serie_b",
   "soccer_uefa_champs_league",
   "soccer_spain_la_liga",
   "soccer_england_premier_league",
   "soccer_italy_serie_a",
   "soccer_germany_bundesliga",
   "soccer_france_ligue_one",
-  "soccer_america_mls",
   "basketball_nba"
 ];
 
@@ -35,17 +35,24 @@ export async function buscarJogos(termo) {
 
       try {
 
-        const url =
-          `https://api.the-odds-api.com/v4/sports/${sport}/odds`;
+        console.log("Consultando esporte:", sport);
 
-        const response = await axios.get(url, {
-          params: {
-            apiKey: API_KEY,
-            regions: "eu,us,uk,br",
-            markets: "h2h",
-            oddsFormat: "decimal"
+        const response = await axios.get(
+          `https://api.the-odds-api.com/v4/sports/${sport}/odds`,
+          {
+            params: {
+              apiKey: API_KEY,
+              regions: "us,uk,eu,br",
+              markets: "h2h",
+              oddsFormat: "decimal"
+            }
           }
-        });
+        );
+
+        console.log(
+          `Jogos recebidos (${sport}):`,
+          response.data.length
+        );
 
         const jogos = response.data || [];
 
@@ -62,19 +69,29 @@ export async function buscarJogos(termo) {
           );
         });
 
+        console.log(
+          `Filtrados (${sport}):`,
+          filtrados.length
+        );
+
         jogosEncontrados.push(...filtrados);
 
       } catch (erroSport) {
 
-        console.log(`Erro no esporte ${sport}`);
+        console.log(
+          `Erro no esporte ${sport}:`,
+          erroSport.response?.data || erroSport.message
+        );
       }
     }
+
+    console.log("TOTAL ENCONTRADOS:", jogosEncontrados.length);
 
     return jogosEncontrados;
 
   } catch (error) {
 
-    console.log("Erro geral:", error.message);
+    console.log("ERRO GERAL:", error.message);
 
     return [];
   }
