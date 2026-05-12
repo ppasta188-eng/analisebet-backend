@@ -1,5 +1,4 @@
 import axios from "axios";
-import { salvarJogos } from "./cacheService.js";
 
 const API_KEY = process.env.ODDS_API_KEY;
 
@@ -10,59 +9,46 @@ const ESPORTES = [
   "soccer_italy_serie_a",
   "soccer_germany_bundesliga",
   "soccer_france_ligue_one",
-  "basketball_nba"
+  "basketball_nba",
 ];
 
-export async function buscarJogos(timeBusca) {
-  let jogosEncontrados = [];
+export async function buscarTodosJogos() {
+  let todosJogos = [];
 
   for (const esporte of ESPORTES) {
     try {
       console.log("===============================");
-      console.log("CONSULTANDO:", esporte);
+      console.log(`CONSULTANDO: ${esporte}`);
 
       const response = await axios.get(
         `https://api.the-odds-api.com/v4/sports/${esporte}/odds`,
         {
           params: {
             apiKey: API_KEY,
-            regions: "eu",
+            regions: "us",
             markets: "h2h",
-            oddsFormat: "decimal"
-          }
+            oddsFormat: "decimal",
+          },
         }
       );
 
-      const jogos = response.data;
+      console.log(`ENCONTRADOS: ${response.data.length}`);
 
-      const encontrados = jogos.filter((jogo) => {
-        const texto =
-          `${jogo.home_team} ${jogo.away_team}`.toLowerCase();
+      todosJogos.push(...response.data);
+    } catch (erro) {
+      console.log(`ERRO NO ESPORTE: ${esporte}`);
 
-        return texto.includes(timeBusca.toLowerCase());
-      });
-
-      console.log("ENCONTRADOS:", encontrados.length);
-
-      jogosEncontrados.push(...encontrados);
-
-    } catch (error) {
-      console.log("===============================");
-      console.log("ERRO NO ESPORTE:", esporte);
-
-      if (error.response?.data) {
-        console.log(error.response.data);
+      if (erro.response?.data) {
+        console.log(erro.response.data);
       } else {
-        console.log(error.message);
+        console.log(erro.message);
       }
     }
   }
 
   console.log("===============================");
-  console.log("TOTAL FINAL:", jogosEncontrados.length);
+  console.log(`TOTAL FINAL: ${todosJogos.length}`);
   console.log("===============================");
 
-  salvarJogos(jogosEncontrados);
-
-  return jogosEncontrados;
+  return todosJogos;
 }
