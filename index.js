@@ -3,73 +3,55 @@ import express from "express";
 
 import {
   salvarJogos,
-  buscarJogosPorTime,
+  buscarJogosPorTime
 } from "./services/cacheService.js";
 
-import { buscarTodosJogos } from "./services/oddsService.js";
+import {
+  buscarTodosJogos
+} from "./services/oddsService.js";
+
+/*
+====================================
+CONFIG
+====================================
+*/
 
 const TOKEN = process.env.TELEGRAM_TOKEN;
-const PORT = process.env.PORT || 10000;
+
+if (!TOKEN) {
+  console.log("TOKEN TELEGRAM NÃO CONFIGURADO");
+  process.exit(1);
+}
+
+const bot = new TelegramBot(TOKEN, {
+  polling: true
+});
+
+console.log("Bot iniciado.");
+
+/*
+====================================
+EXPRESS / RENDER
+====================================
+*/
 
 const app = express();
 
+const PORT = process.env.PORT || 10000;
+
 app.get("/", (req, res) => {
-  res.send("AnaliseBet Bot ONLINE");
+  res.send("AnaliseBet Backend Online");
 });
 
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
 
-if (!TOKEN) {
-  console.log("TELEGRAM_TOKEN NÃO CONFIGURADO");
-  process.exit(1);
-}
-
-const bot = new TelegramBot(TOKEN, {
-  polling: true,
-});
-
-console.log("Bot iniciado.");
-
-bot.on("polling_error", async (erro) => {
-  console.log("POLLING ERROR:");
-  console.log(erro.message);
-
-  if (
-    erro.message.includes("409")
-  ) {
-    console.log(
-      "CONFLITO 409 DETECTADO - REINICIANDO POLLING..."
-    );
-
-    try {
-      await bot.stopPolling();
-
-      setTimeout(async () => {
-        try {
-          await bot.startPolling();
-
-          console.log(
-            "POLLING REINICIADO COM SUCESSO"
-          );
-        } catch (e) {
-          console.log(
-            "ERRO AO REINICIAR POLLING:"
-          );
-
-          console.log(e.message);
-        }
-      }, 3000);
-    } catch (e) {
-      console.log(
-        "ERRO AO PARAR POLLING:"
-      );
-
-      console.log(e.message);
-    }
-  }
-});
+/*
+====================================
+ATUALIZAÇÃO DE CACHE
+====================================
+*/
 
 async function atualizarCache() {
   try {
@@ -79,13 +61,25 @@ async function atualizarCache() {
 
     const jogos = await buscarTodosJogos();
 
+    /*
+    ====================================
+    PROTEÇÃO DE CACHE
+    NÃO SOBRESCREVER COM ARRAY VAZIO
+    ====================================
+    */
+
+    if (!jogos || jogos.length === 0) {
+      console.log("=======================");
+      console.log("CACHE MANTIDO");
+      console.log("API RETORNOU 0 JOGOS");
+      console.log("=======================");
+
+      return;
+    }
+
     salvarJogos(jogos);
 
-    console.log("===============================");
-    console.log("TOTAL FINAL:", jogos.length);
-    console.log("===============================");
-
-    console.log("===============================");
+    console.log("=======================");
     console.log("CACHE SALVO:");
     console.log(jogos.length);
   } catch (erro) {
@@ -94,11 +88,30 @@ async function atualizarCache() {
   }
 }
 
+/*
+====================================
+INICIALIZAÇÃO
+====================================
+*/
+
 await atualizarCache();
+
+/*
+====================================
+ATUALIZAÇÃO AUTOMÁTICA
+15 MINUTOS
+====================================
+*/
 
 setInterval(async () => {
   await atualizarCache();
-}, 5 * 60 * 1000);
+}, 15 * 60 * 1000);
+
+/*
+====================================
+BUSCA INTELIGENTE
+====================================
+*/
 
 bot.on("message", async (msg) => {
   try {
@@ -106,105 +119,73 @@ bot.on("message", async (msg) => {
 
     const texto = msg.text?.trim();
 
-    if (!texto) return;
+    if (!texto) {
+      return;
+    }
 
-    console.log("BUSCANDO NO CACHE:");
-    console.log(texto);
+    const jogos = buscarJogosPorTime(texto);
 
-    const resultados = buscarJogosPorTime(texto);
-
-    if (!resultados.length) {
+    if (!jogos || jogos.length === 0) {
       await bot.sendMessage(
         chatId,
-        "❌ Nenhum jogo encontrado."
+        "Nenhum jogo encontrado."
       );
 
       return;
     }
 
-    let resposta = "📊 Jogos encontrados\n\n";
+    /*
+    ====================================
+    LIMITAR TAMANHO TELEGRAM
+    ====================================
+    */
 
-    resultados.slice(0, 20).forEach((jogo) => {
-      const home = jogo.home_team;
-      const away = jogo.away_team;
+    const mensagens = [];
 
-      const odds =
-        jogo.bookmakers?.[0]?.markets?.[0]?.outcomes || [];
+    let blocoAtual = "";
 
-      const oddCasa = odds.find(
-        (o) => o.name === home
-      )?.price || "-";
+    for (const jogo of jogos) {
+      const linha =
+`🏆 ${jogo.sport_title}
 
-      const oddFora = odds.find(
-        (o) => o.name === away
-      )?.price || "-";
+⚽ ${jogo.home_team} x ${jogo.away_team}
 
-      const oddEmpate = odds.find(
-        (o) =>
-          o.name?.toLowerCase() === "draw"
-      )?.price || "-";
+📅 ${new Date(jogo.commence_time).toLocaleString("pt-BR")}
 
-      let favorito = "-";
-      let oddFavorita = "-";
+────────────────────
 
-      if (
-        typeof oddCasa === "number" &&
-        typeof oddFora === "number"
-      ) {
-        favorito =
-          oddCasa < oddFora ? home : away;
+`;
 
-        oddFavorita =
-          oddCasa < oddFora
-            ? oddCasa
-            : oddFora;
-      }
-
-      let risco = "Alto";
-
-      if (typeof oddFavorita === "number") {
-        if (oddFavorita <= 1.60) {
-          risco = "Baixo";
-        } else if (oddFavorita <= 2.20) {
-          risco = "Médio";
-        }
-      }
-
-      resposta += `⚽ ${home} x ${away}\n`;
-      resposta += `🏆 ${jogo.sport_title}\n\n`;
-
-      resposta += `• ${home}: ${oddCasa}\n`;
-      resposta += `• ${away}: ${oddFora}\n`;
-      resposta += `• Empate: ${oddEmpate}\n\n`;
-
-      resposta += `🧠 Análise IA:\n`;
-      resposta += `⭐ Favorito: ${favorito}\n`;
-      resposta += `📉 Odd favorita: ${oddFavorita}\n`;
-      resposta += `⚠️ Risco: ${risco}\n`;
-
-      resposta += `\n━━━━━━━━━━━━━━━\n\n`;
-    });
-
-    const LIMITE = 3500;
-
-    if (resposta.length <= LIMITE) {
-      await bot.sendMessage(chatId, resposta);
-    } else {
-      for (
-        let i = 0;
-        i < resposta.length;
-        i += LIMITE
-      ) {
-        const parte = resposta.slice(
-          i,
-          i + LIMITE
-        );
-
-        await bot.sendMessage(chatId, parte);
+      if ((blocoAtual + linha).length > 3500) {
+        mensagens.push(blocoAtual);
+        blocoAtual = linha;
+      } else {
+        blocoAtual += linha;
       }
     }
+
+    if (blocoAtual.length > 0) {
+      mensagens.push(blocoAtual);
+    }
+
+    for (const mensagem of mensagens) {
+      await bot.sendMessage(chatId, mensagem);
+    }
+
   } catch (erro) {
     console.log("ERRO GERAL:");
     console.log(erro.message);
   }
+});
+
+/*
+====================================
+POLLING ERROR
+SEM RESTART MANUAL
+====================================
+*/
+
+bot.on("polling_error", (erro) => {
+  console.log("POLLING ERROR:");
+  console.log(erro.message);
 });
