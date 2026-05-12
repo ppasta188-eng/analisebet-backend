@@ -1,102 +1,98 @@
 import TelegramBot from "node-telegram-bot-api";
+import express from "express";
 
-import { buscarJogos } from "./services/oddsService.js";
-import { analisarJogo } from "./services/analysisService.js";
 import {
   salvarJogos,
-  obterJogos
+  obterJogos,
+  buscarJogosPorTime,
 } from "./services/cacheService.js";
 
-const TOKEN = process.env.TELEGRAM_TOKEN;
+import { analisarJogo } from "./services/analysisService.js";
 
-const bot = new TelegramBot(TOKEN, {
-  polling: true
+import { buscarTodosJogos } from "./services/oddsService.js";
+
+const app = express();
+
+const PORT = process.env.PORT || 10000;
+
+app.get("/", (req, res) => {
+  res.send("AnaliseBet Bot Online");
+});
+
+app.listen(PORT, () => {
+  console.log(`Servidor rodando na porta ${PORT}`);
+});
+
+const token = process.env.TELEGRAM_TOKEN;
+
+if (!token) {
+  console.log("TOKEN TELEGRAM NÃO ENCONTRADO");
+  process.exit(1);
+}
+
+const bot = new TelegramBot(token, {
+  polling: true,
 });
 
 console.log("Bot iniciado.");
 
 async function atualizarCache() {
-  console.log("=======================");
-  console.log("ATUALIZANDO CACHE...");
-  console.log("=======================");
-
   try {
-    const jogos = await buscarJogos("");
+    console.log("=======================");
+    console.log("ATUALIZANDO CACHE...");
+    console.log("=======================");
+
+    const jogos = await buscarTodosJogos();
 
     salvarJogos(jogos);
 
+    console.log("===============================");
     console.log("CACHE SALVO:");
     console.log(jogos.length);
-
-  } catch (error) {
-    console.log("ERRO NO CACHE:");
-    console.log(error.message);
+  } catch (erro) {
+    console.log("ERRO AO ATUALIZAR CACHE:");
+    console.log(erro.message);
   }
 }
 
-atualizarCache();
+await atualizarCache();
 
-setInterval(() => {
-  atualizarCache();
-}, 1000 * 60 * 5);
+setInterval(async () => {
+  await atualizarCache();
+}, 5 * 60 * 1000);
 
 bot.on("message", async (msg) => {
-  const chatId = msg.chat.id;
-  const texto = msg.text;
+  try {
+    const chatId = msg.chat.id;
+    const texto = msg.text;
 
-  if (!texto) {
-    return;
+    console.log("BUSCANDO NO CACHE:");
+    console.log(texto);
+
+    const jogos = buscarJogosPorTime(texto);
+
+    if (!jogos.length) {
+      bot.sendMessage(
+        chatId,
+        "❌ Nenhum jogo encontrado no cache."
+      );
+
+      return;
+    }
+
+    let resposta = "📊 Jogos encontrados\n\n";
+
+    for (const jogo of jogos) {
+      const analise = analisarJogo(jogo);
+
+      if (analise) {
+        resposta += analise + "\n";
+      }
+    }
+
+    bot.sendMessage(chatId, resposta);
+  } catch (erro) {
+    console.log("ERRO GERAL:");
+    console.log(erro.message);
   }
-
-  console.log("BUSCANDO NO CACHE:");
-  console.log(texto);
-
-  bot.sendMessage(
-    chatId,
-    "🔎 Buscando jogos no cache local..."
-  );
-
-  const jogos = obterJogos();
-
-  const encontrados = jogos.filter((jogo) => {
-    const nomeJogo =
-      `${jogo.home_team} ${jogo.away_team}`.toLowerCase();
-
-    return nomeJogo.includes(texto.toLowerCase());
-  });
-
-  if (encontrados.length === 0) {
-    bot.sendMessage(
-      chatId,
-      "❌ Nenhum jogo encontrado no cache."
-    );
-
-    return;
-  }
-
-  let resposta =
-    `📊 Jogos encontrados (${encontrados.length})\n\n`;
-
-  encontrados.forEach((jogo) => {
-    const analise = analisarJogo(jogo);
-
-    resposta += `
-⚽ ${jogo.home_team} x ${jogo.away_team}
-🏆 ${jogo.sport_title}
-
-• ${analise.home}: ${analise.homeOdd}
-• ${analise.away}: ${analise.awayOdd}
-• Empate: ${analise.drawOdd}
-
-🧠 Análise IA:
-⭐ Favorito: ${analise.favorito}
-📉 Odd favorita: ${analise.oddFavorita}
-⚠️ Risco: ${analise.risco}
-
-━━━━━━━━━━━━━━━
-
-`;
-  });
-
-  bot.sendMessage(chatId, resposta);
 });
