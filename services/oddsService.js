@@ -15,7 +15,6 @@ const SPORTS = [
 ];
 
 function normalizar(texto) {
-
   return texto
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -85,13 +84,19 @@ export async function buscarJogos(termo) {
       }
     }
 
-    console.log("TOTAL ENCONTRADOS:", jogosEncontrados.length);
+    console.log(
+      "TOTAL ENCONTRADOS:",
+      jogosEncontrados.length
+    );
 
     return jogosEncontrados;
 
   } catch (error) {
 
-    console.log("ERRO GERAL:", error.message);
+    console.log(
+      "ERRO GERAL:",
+      error.message
+    );
 
     return [];
   }
