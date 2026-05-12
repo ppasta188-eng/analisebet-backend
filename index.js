@@ -6,32 +6,29 @@ import {
   buscarJogosPorTime,
 } from "./services/cacheService.js";
 
-import { analisarJogo } from "./services/analysisService.js";
-
 import { buscarTodosJogos } from "./services/oddsService.js";
+
+const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const PORT = process.env.PORT || 10000;
 
 const app = express();
 
-const PORT = process.env.PORT || 10000;
-
 app.get("/", (req, res) => {
-  res.send("AnaliseBet Online");
+  res.send("AnaliseBet Bot ONLINE");
 });
 
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
 
-const token = process.env.TELEGRAM_TOKEN;
-
-if (!token) {
-  console.log("TOKEN TELEGRAM NÃO ENCONTRADO");
+if (!TOKEN) {
+  console.log("TOKEN TELEGRAM NÃO CONFIGURADO");
   process.exit(1);
 }
 
-const bot = new TelegramBot(token, {
+const bot = new TelegramBot(TOKEN, {
   polling: {
-    interval: 1000,
+    interval: 300,
     autoStart: true,
     params: {
       timeout: 10,
@@ -51,7 +48,7 @@ async function atualizarCache() {
 
     salvarJogos(jogos);
 
-    console.log("===============================");
+    console.log("=======================");
     console.log("CACHE SALVO:");
     console.log(jogos.length);
   } catch (erro) {
@@ -69,46 +66,79 @@ setInterval(async () => {
 bot.on("message", async (msg) => {
   try {
     const chatId = msg.chat.id;
-    const texto = msg.text;
+
+    const texto = msg.text?.trim();
+
+    if (!texto) return;
 
     console.log("BUSCANDO NO CACHE:");
     console.log(texto);
 
-    const jogos = buscarJogosPorTime(texto);
+    const resultados = buscarJogosPorTime(texto);
 
-    if (!jogos.length) {
+    if (!resultados.length) {
       await bot.sendMessage(
         chatId,
         "❌ Nenhum jogo encontrado."
       );
-
       return;
     }
 
     let resposta = "📊 Jogos encontrados\n\n";
 
-    for (const jogo of jogos) {
-      const analise = analisarJogo(jogo);
+    resultados.slice(0, 10).forEach((jogo) => {
+      const home = jogo.home_team;
+      const away = jogo.away_team;
 
-      if (analise) {
-        resposta += analise + "\n";
+      const odds = jogo.bookmakers?.[0]?.markets?.[0]?.outcomes || [];
+
+      const oddCasa = odds.find(
+        (o) => o.name === home
+      )?.price;
+
+      const oddFora = odds.find(
+        (o) => o.name === away
+      )?.price;
+
+      const oddEmpate = odds.find(
+        (o) =>
+          o.name?.toLowerCase() === "draw"
+      )?.price;
+
+      const favorito =
+        oddCasa < oddFora ? home : away;
+
+      const oddFavorita =
+        oddCasa < oddFora
+          ? oddCasa
+          : oddFora;
+
+      let risco = "Alto";
+
+      if (oddFavorita <= 1.60) {
+        risco = "Baixo";
+      } else if (oddFavorita <= 2.20) {
+        risco = "Médio";
       }
-    }
+
+      resposta += `⚽ ${home} x ${away}\n`;
+      resposta += `🏆 ${jogo.sport_title}\n\n`;
+
+      resposta += `• ${home}: ${oddCasa}\n`;
+      resposta += `• ${away}: ${oddFora}\n`;
+      resposta += `• Empate: ${oddEmpate}\n\n`;
+
+      resposta += `🧠 Análise IA:\n`;
+      resposta += `⭐ Favorito: ${favorito}\n`;
+      resposta += `📉 Odd favorita: ${oddFavorita}\n`;
+      resposta += `⚠️ Risco: ${risco}\n`;
+
+      resposta += `\n━━━━━━━━━━━━━━━\n\n`;
+    });
 
     await bot.sendMessage(chatId, resposta);
-
   } catch (erro) {
-    console.log("ERRO GERAL:");
+    console.log("ERRO TELEGRAM:");
     console.log(erro.message);
   }
-});
-
-process.on("SIGINT", () => {
-  bot.stopPolling();
-  process.exit(0);
-});
-
-process.on("SIGTERM", () => {
-  bot.stopPolling();
-  process.exit(0);
 });
