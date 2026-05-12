@@ -27,16 +27,49 @@ if (!TOKEN) {
 }
 
 const bot = new TelegramBot(TOKEN, {
-  polling: {
-    interval: 300,
-    autoStart: true,
-    params: {
-      timeout: 10,
-    },
-  },
+  polling: true,
 });
 
 console.log("Bot iniciado.");
+
+bot.on("polling_error", async (erro) => {
+  console.log("POLLING ERROR:");
+  console.log(erro.message);
+
+  if (
+    erro.message.includes("409")
+  ) {
+    console.log(
+      "CONFLITO 409 DETECTADO - REINICIANDO POLLING..."
+    );
+
+    try {
+      await bot.stopPolling();
+
+      setTimeout(async () => {
+        try {
+          await bot.startPolling();
+
+          console.log(
+            "POLLING REINICIADO COM SUCESSO"
+          );
+        } catch (e) {
+          console.log(
+            "ERRO AO REINICIAR POLLING:"
+          );
+
+          console.log(e.message);
+        }
+      }, 3000);
+    } catch (e) {
+      console.log(
+        "ERRO AO PARAR POLLING:"
+      );
+
+      console.log(e.message);
+    }
+  }
+});
 
 async function atualizarCache() {
   try {
@@ -47,6 +80,10 @@ async function atualizarCache() {
     const jogos = await buscarTodosJogos();
 
     salvarJogos(jogos);
+
+    console.log("===============================");
+    console.log("TOTAL FINAL:", jogos.length);
+    console.log("===============================");
 
     console.log("===============================");
     console.log("CACHE SALVO:");
@@ -60,7 +97,7 @@ async function atualizarCache() {
 await atualizarCache();
 
 setInterval(async () => {
-  atualizarCache();
+  await atualizarCache();
 }, 5 * 60 * 1000);
 
 bot.on("message", async (msg) => {
@@ -81,12 +118,13 @@ bot.on("message", async (msg) => {
         chatId,
         "❌ Nenhum jogo encontrado."
       );
+
       return;
     }
 
     let resposta = "📊 Jogos encontrados\n\n";
 
-    resultados.slice(0, 10).forEach((jogo) => {
+    resultados.slice(0, 20).forEach((jogo) => {
       const home = jogo.home_team;
       const away = jogo.away_team;
 
@@ -95,31 +133,41 @@ bot.on("message", async (msg) => {
 
       const oddCasa = odds.find(
         (o) => o.name === home
-      )?.price;
+      )?.price || "-";
 
       const oddFora = odds.find(
         (o) => o.name === away
-      )?.price;
+      )?.price || "-";
 
       const oddEmpate = odds.find(
         (o) =>
           o.name?.toLowerCase() === "draw"
-      )?.price;
+      )?.price || "-";
 
-      const favorito =
-        oddCasa < oddFora ? home : away;
+      let favorito = "-";
+      let oddFavorita = "-";
 
-      const oddFavorita =
-        oddCasa < oddFora
-          ? oddCasa
-          : oddFora;
+      if (
+        typeof oddCasa === "number" &&
+        typeof oddFora === "number"
+      ) {
+        favorito =
+          oddCasa < oddFora ? home : away;
+
+        oddFavorita =
+          oddCasa < oddFora
+            ? oddCasa
+            : oddFora;
+      }
 
       let risco = "Alto";
 
-      if (oddFavorita <= 1.60) {
-        risco = "Baixo";
-      } else if (oddFavorita <= 2.20) {
-        risco = "Médio";
+      if (typeof oddFavorita === "number") {
+        if (oddFavorita <= 1.60) {
+          risco = "Baixo";
+        } else if (oddFavorita <= 2.20) {
+          risco = "Médio";
+        }
       }
 
       resposta += `⚽ ${home} x ${away}\n`;
@@ -137,9 +185,26 @@ bot.on("message", async (msg) => {
       resposta += `\n━━━━━━━━━━━━━━━\n\n`;
     });
 
-    await bot.sendMessage(chatId, resposta);
+    const LIMITE = 3500;
+
+    if (resposta.length <= LIMITE) {
+      await bot.sendMessage(chatId, resposta);
+    } else {
+      for (
+        let i = 0;
+        i < resposta.length;
+        i += LIMITE
+      ) {
+        const parte = resposta.slice(
+          i,
+          i + LIMITE
+        );
+
+        await bot.sendMessage(chatId, parte);
+      }
+    }
   } catch (erro) {
-    console.log("ERRO TELEGRAM:");
+    console.log("ERRO GERAL:");
     console.log(erro.message);
   }
 });
