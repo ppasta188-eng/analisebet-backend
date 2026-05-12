@@ -3,7 +3,6 @@ import express from "express";
 
 import {
   salvarJogos,
-  obterJogos,
   buscarJogosPorTime,
 } from "./services/cacheService.js";
 
@@ -16,7 +15,7 @@ const app = express();
 const PORT = process.env.PORT || 10000;
 
 app.get("/", (req, res) => {
-  res.send("AnaliseBet Bot Online");
+  res.send("AnaliseBet Online");
 });
 
 app.listen(PORT, () => {
@@ -31,7 +30,13 @@ if (!token) {
 }
 
 const bot = new TelegramBot(token, {
-  polling: true,
+  polling: {
+    interval: 1000,
+    autoStart: true,
+    params: {
+      timeout: 10,
+    },
+  },
 });
 
 console.log("Bot iniciado.");
@@ -72,9 +77,9 @@ bot.on("message", async (msg) => {
     const jogos = buscarJogosPorTime(texto);
 
     if (!jogos.length) {
-      bot.sendMessage(
+      await bot.sendMessage(
         chatId,
-        "❌ Nenhum jogo encontrado no cache."
+        "❌ Nenhum jogo encontrado."
       );
 
       return;
@@ -90,9 +95,20 @@ bot.on("message", async (msg) => {
       }
     }
 
-    bot.sendMessage(chatId, resposta);
+    await bot.sendMessage(chatId, resposta);
+
   } catch (erro) {
     console.log("ERRO GERAL:");
     console.log(erro.message);
   }
+});
+
+process.on("SIGINT", () => {
+  bot.stopPolling();
+  process.exit(0);
+});
+
+process.on("SIGTERM", () => {
+  bot.stopPolling();
+  process.exit(0);
 });
