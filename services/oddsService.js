@@ -1,104 +1,68 @@
 import axios from "axios";
+import { salvarJogos } from "./cacheService.js";
 
 const API_KEY = process.env.ODDS_API_KEY;
 
-const SPORTS = [
+const ESPORTES = [
   "soccer_brazil_campeonato",
-  "soccer_uefa_champs_league",
+  "soccer_brazil_serie_b",
   "soccer_spain_la_liga",
-  "soccer_epl",
   "soccer_italy_serie_a",
   "soccer_germany_bundesliga",
   "soccer_france_ligue_one",
   "basketball_nba"
 ];
 
-function normalizar(texto) {
-
-  return texto
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
-}
-
-export async function buscarJogos(termo) {
-
-  const busca = normalizar(termo);
-
+export async function buscarJogos(timeBusca) {
   let jogosEncontrados = [];
 
-  console.log("=================================");
-  console.log("BUSCA RECEBIDA:", busca);
-  console.log("=================================");
-
-  for (const sport of SPORTS) {
-
+  for (const esporte of ESPORTES) {
     try {
-
-      console.log("");
-      console.log("=================================");
-      console.log("CONSULTANDO:", sport);
-      console.log("=================================");
+      console.log("===============================");
+      console.log("CONSULTANDO:", esporte);
 
       const response = await axios.get(
-        `https://api.the-odds-api.com/v4/sports/${sport}/odds`,
+        `https://api.the-odds-api.com/v4/sports/${esporte}/odds`,
         {
           params: {
             apiKey: API_KEY,
-            regions: "us",
+            regions: "eu",
             markets: "h2h",
             oddsFormat: "decimal"
           }
         }
       );
 
-      const jogos = response.data || [];
+      const jogos = response.data;
 
-      console.log("TOTAL RECEBIDO:", jogos.length);
+      const encontrados = jogos.filter((jogo) => {
+        const texto =
+          `${jogo.home_team} ${jogo.away_team}`.toLowerCase();
 
-      if (jogos.length > 0) {
-
-        console.log("EXEMPLO JOGO:");
-
-        console.log({
-          home: jogos[0].home_team,
-          away: jogos[0].away_team,
-          league: jogos[0].sport_title
-        });
-      }
-
-      const filtrados = jogos.filter((jogo) => {
-
-        const home = normalizar(jogo.home_team || "");
-        const away = normalizar(jogo.away_team || "");
-        const league = normalizar(jogo.sport_title || "");
-
-        return (
-          home.includes(busca) ||
-          away.includes(busca) ||
-          league.includes(busca)
-        );
+        return texto.includes(timeBusca.toLowerCase());
       });
 
-      console.log("FILTRADOS:", filtrados.length);
+      console.log("ENCONTRADOS:", encontrados.length);
 
-      jogosEncontrados.push(...filtrados);
+      jogosEncontrados.push(...encontrados);
 
-    } catch (erro) {
+    } catch (error) {
+      console.log("===============================");
+      console.log("ERRO NO ESPORTE:", esporte);
 
-      console.log("ERRO NO ESPORTE:", sport);
-
-      console.log(
-        erro.response?.data || erro.message
-      );
+      if (error.response?.data) {
+        console.log(error.response.data);
+      } else {
+        console.log(error.message);
+      }
     }
   }
 
-  console.log("");
-  console.log("=================================");
+  console.log("===============================");
   console.log("TOTAL FINAL:", jogosEncontrados.length);
-  console.log("=================================");
+  console.log("===============================");
+
+  salvarJogos(jogosEncontrados);
 
   return jogosEncontrados;
 }
