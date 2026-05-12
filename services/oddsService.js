@@ -24,80 +24,81 @@ function normalizar(texto) {
 
 export async function buscarJogos(termo) {
 
-  try {
+  const busca = normalizar(termo);
 
-    const busca = normalizar(termo);
+  let jogosEncontrados = [];
 
-    let jogosEncontrados = [];
+  console.log("=================================");
+  console.log("BUSCA RECEBIDA:", busca);
+  console.log("=================================");
 
-    for (const sport of SPORTS) {
+  for (const sport of SPORTS) {
 
-      try {
+    try {
 
-        console.log("Consultando esporte:", sport);
+      console.log("");
+      console.log("=================================");
+      console.log("CONSULTANDO:", sport);
+      console.log("=================================");
 
-        const response = await axios.get(
-          `https://api.the-odds-api.com/v4/sports/${sport}/odds`,
-          {
-            params: {
-              apiKey: API_KEY,
-              regions: "us,uk",
-              markets: "h2h",
-              oddsFormat: "decimal"
-            }
+      const response = await axios.get(
+        `https://api.the-odds-api.com/v4/sports/${sport}/odds`,
+        {
+          params: {
+            apiKey: API_KEY,
+            regions: "us",
+            markets: "h2h",
+            oddsFormat: "decimal"
           }
-        );
+        }
+      );
 
-        console.log(
-          `Jogos recebidos (${sport}):`,
-          response.data.length
-        );
+      const jogos = response.data || [];
 
-        const jogos = response.data || [];
+      console.log("TOTAL RECEBIDO:", jogos.length);
 
-        const filtrados = jogos.filter((jogo) => {
+      if (jogos.length > 0) {
 
-          const home = normalizar(jogo.home_team || "");
-          const away = normalizar(jogo.away_team || "");
-          const league = normalizar(jogo.sport_title || "");
+        console.log("EXEMPLO JOGO:");
 
-          return (
-            home.includes(busca) ||
-            away.includes(busca) ||
-            league.includes(busca)
-          );
+        console.log({
+          home: jogos[0].home_team,
+          away: jogos[0].away_team,
+          league: jogos[0].sport_title
         });
-
-        console.log(
-          `Filtrados (${sport}):`,
-          filtrados.length
-        );
-
-        jogosEncontrados.push(...filtrados);
-
-      } catch (erroSport) {
-
-        console.log(
-          `Erro no esporte ${sport}:`,
-          erroSport.response?.data || erroSport.message
-        );
       }
+
+      const filtrados = jogos.filter((jogo) => {
+
+        const home = normalizar(jogo.home_team || "");
+        const away = normalizar(jogo.away_team || "");
+        const league = normalizar(jogo.sport_title || "");
+
+        return (
+          home.includes(busca) ||
+          away.includes(busca) ||
+          league.includes(busca)
+        );
+      });
+
+      console.log("FILTRADOS:", filtrados.length);
+
+      jogosEncontrados.push(...filtrados);
+
+    } catch (erro) {
+
+      console.log("ERRO NO ESPORTE:", sport);
+
+      console.log(
+        erro.response?.data || erro.message
+      );
     }
-
-    console.log(
-      "TOTAL ENCONTRADOS:",
-      jogosEncontrados.length
-    );
-
-    return jogosEncontrados;
-
-  } catch (error) {
-
-    console.log(
-      "ERRO GERAL:",
-      error.message
-    );
-
-    return [];
   }
+
+  console.log("");
+  console.log("=================================");
+  console.log("TOTAL FINAL:", jogosEncontrados.length);
+  console.log("=================================");
+
+  return jogosEncontrados;
 }
