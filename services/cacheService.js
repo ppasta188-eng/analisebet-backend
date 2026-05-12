@@ -43,48 +43,60 @@ function gerarTermosBusca(jogo) {
   termos.push(esporte);
   termos.push(key);
 
-  // aliases inteligentes
+  // Brasileirão
   if (key.includes("brazil_campeonato")) {
     termos.push("brasileirao");
     termos.push("brasileirão");
     termos.push("serie a");
     termos.push("série a");
     termos.push("brasil serie a");
+    termos.push("campeonato brasileiro");
   }
 
+  // Série B
   if (key.includes("brazil_serie_b")) {
     termos.push("serie b");
     termos.push("série b");
     termos.push("brasil serie b");
   }
 
+  // La Liga
   if (key.includes("spain_la_liga")) {
     termos.push("la liga");
     termos.push("laliga");
     termos.push("espanhol");
+    termos.push("campeonato espanhol");
   }
 
+  // Italiano
   if (key.includes("italy_serie_a")) {
     termos.push("italiano");
     termos.push("serie a italia");
+    termos.push("campeonato italiano");
   }
 
+  // Bundesliga
   if (key.includes("germany_bundesliga")) {
     termos.push("bundesliga");
     termos.push("alemao");
     termos.push("alemão");
+    termos.push("campeonato alemao");
   }
 
+  // Francês
   if (key.includes("france_ligue_one")) {
     termos.push("ligue 1");
     termos.push("frances");
     termos.push("francês");
+    termos.push("campeonato frances");
   }
 
+  // Champions
   if (key.includes("champions")) {
     termos.push("champions");
     termos.push("liga dos campeoes");
     termos.push("liga dos campeões");
+    termos.push("ucl");
   }
 
   return termos.map(normalizarTexto);
@@ -108,4 +120,13 @@ export function buscarNoCache(textoBusca) {
       );
     });
   });
+}
+
+/*
+COMPATIBILIDADE COM CÓDIGOS ANTIGOS
+NÃO REMOVER
+*/
+
+export function buscarJogosPorTime(textoBusca) {
+  return buscarNoCache(textoBusca);
 }
