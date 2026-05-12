@@ -8,7 +8,7 @@ import {
 
 import { buscarTodosJogos } from "./services/oddsService.js";
 
-const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TOKEN = process.env.TELEGRAM_TOKEN;
 const PORT = process.env.PORT || 10000;
 
 const app = express();
@@ -22,7 +22,7 @@ app.listen(PORT, () => {
 });
 
 if (!TOKEN) {
-  console.log("TOKEN TELEGRAM NÃO CONFIGURADO");
+  console.log("TELEGRAM_TOKEN NÃO CONFIGURADO");
   process.exit(1);
 }
 
@@ -48,7 +48,7 @@ async function atualizarCache() {
 
     salvarJogos(jogos);
 
-    console.log("=======================");
+    console.log("===============================");
     console.log("CACHE SALVO:");
     console.log(jogos.length);
   } catch (erro) {
@@ -60,7 +60,7 @@ async function atualizarCache() {
 await atualizarCache();
 
 setInterval(async () => {
-  await atualizarCache();
+  atualizarCache();
 }, 5 * 60 * 1000);
 
 bot.on("message", async (msg) => {
@@ -90,7 +90,8 @@ bot.on("message", async (msg) => {
       const home = jogo.home_team;
       const away = jogo.away_team;
 
-      const odds = jogo.bookmakers?.[0]?.markets?.[0]?.outcomes || [];
+      const odds =
+        jogo.bookmakers?.[0]?.markets?.[0]?.outcomes || [];
 
       const oddCasa = odds.find(
         (o) => o.name === home
