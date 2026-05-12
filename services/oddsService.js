@@ -4,10 +4,9 @@ const API_KEY = process.env.ODDS_API_KEY;
 
 const SPORTS = [
   "soccer_brazil_campeonato",
-  "soccer_brazil_serie_b",
   "soccer_uefa_champs_league",
   "soccer_spain_la_liga",
-  "soccer_england_premier_league",
+  "soccer_epl",
   "soccer_italy_serie_a",
   "soccer_germany_bundesliga",
   "soccer_france_ligue_one",
@@ -15,6 +14,7 @@ const SPORTS = [
 ];
 
 function normalizar(texto) {
+
   return texto
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -41,7 +41,7 @@ export async function buscarJogos(termo) {
           {
             params: {
               apiKey: API_KEY,
-              regions: "us,uk,eu,br",
+              regions: "us,uk",
               markets: "h2h",
               oddsFormat: "decimal"
             }
