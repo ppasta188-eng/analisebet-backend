@@ -1,11 +1,31 @@
-let jogosCache = [];
+import fs from "fs";
 
-function normalizarTexto(texto) {
+const CAMINHO_CACHE = "./cacheJogos.json";
+
+export function salvarCache(jogos) {
+  fs.writeFileSync(
+    CAMINHO_CACHE,
+    JSON.stringify(jogos, null, 2),
+    "utf-8"
+  );
+}
+
+export function carregarCache() {
+  if (!fs.existsSync(CAMINHO_CACHE)) {
+    return [];
+  }
+
+  const dados = fs.readFileSync(CAMINHO_CACHE, "utf-8");
+
+  return JSON.parse(dados);
+}
+
+function normalizarTexto(texto = "") {
   return texto
-    ?.toString()
+    .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, "")
     .trim();
 }
 
@@ -14,112 +34,78 @@ function gerarTermosBusca(jogo) {
 
   const home = jogo.home_team || "";
   const away = jogo.away_team || "";
-  const sport = jogo.sport_title || "";
-  const league = jogo.sport_key || "";
+  const esporte = jogo.sport_title || "";
+  const key = jogo.sport_key || "";
 
   termos.push(home);
   termos.push(away);
   termos.push(`${home} ${away}`);
-  termos.push(sport);
-  termos.push(league);
+  termos.push(esporte);
+  termos.push(key);
 
-  // Brasileirão
-  if (
-    league.includes("brazil") ||
-    sport.toLowerCase().includes("brazil")
-  ) {
+  // aliases inteligentes
+  if (key.includes("brazil_campeonato")) {
     termos.push("brasileirao");
     termos.push("brasileirão");
-    termos.push("brasil");
     termos.push("serie a");
-    termos.push("campeonato brasileiro");
+    termos.push("série a");
+    termos.push("brasil serie a");
   }
 
-  // Copa do Brasil
-  if (
-    sport.toLowerCase().includes("copa") ||
-    league.toLowerCase().includes("copa")
-  ) {
-    termos.push("copa do brasil");
-    termos.push("copa brasil");
+  if (key.includes("brazil_serie_b")) {
+    termos.push("serie b");
+    termos.push("série b");
+    termos.push("brasil serie b");
   }
 
-  // La Liga
-  if (
-    league.includes("spain") ||
-    sport.toLowerCase().includes("la liga")
-  ) {
+  if (key.includes("spain_la_liga")) {
     termos.push("la liga");
     termos.push("laliga");
     termos.push("espanhol");
   }
 
-  // Champions
-  if (
-    league.includes("champions") ||
-    sport.toLowerCase().includes("champions")
-  ) {
-    termos.push("champions");
-    termos.push("liga dos campeoes");
-    termos.push("liga dos campeões");
-    termos.push("ucl");
+  if (key.includes("italy_serie_a")) {
+    termos.push("italiano");
+    termos.push("serie a italia");
   }
 
-  // Bundesliga
-  if (
-    league.includes("bundesliga") ||
-    sport.toLowerCase().includes("bundesliga")
-  ) {
+  if (key.includes("germany_bundesliga")) {
     termos.push("bundesliga");
     termos.push("alemao");
     termos.push("alemão");
   }
 
-  // NBA
-  if (
-    league.includes("nba") ||
-    sport.toLowerCase().includes("nba")
-  ) {
-    termos.push("nba");
-    termos.push("basquete");
-  }
-
-  // Serie A Itália
-  if (
-    league.includes("italy") ||
-    sport.toLowerCase().includes("serie a")
-  ) {
-    termos.push("italiano");
-    termos.push("serie a italia");
-    termos.push("serie a italiana");
-  }
-
-  // Ligue 1
-  if (
-    league.includes("france") ||
-    sport.toLowerCase().includes("ligue")
-  ) {
+  if (key.includes("france_ligue_one")) {
+    termos.push("ligue 1");
     termos.push("frances");
     termos.push("francês");
-    termos.push("ligue 1");
+  }
+
+  if (key.includes("champions")) {
+    termos.push("champions");
+    termos.push("liga dos campeoes");
+    termos.push("liga dos campeões");
   }
 
   return termos.map(normalizarTexto);
 }
 
-export function salvarJogos(jogos) {
-  jogosCache = jogos.map((jogo) => ({
-    ...jogo,
-    termosBusca: gerarTermosBusca(jogo),
-  }));
-}
+export function buscarNoCache(textoBusca) {
+  const jogos = carregarCache();
 
-export function buscarJogosPorTime(texto) {
-  const busca = normalizarTexto(texto);
+  const busca = normalizarTexto(textoBusca);
 
-  return jogosCache.filter((jogo) => {
-    return jogo.termosBusca.some((termo) =>
-      termo.includes(busca)
-    );
+  console.log("BUSCANDO NO CACHE:");
+  console.log(textoBusca);
+
+  return jogos.filter((jogo) => {
+    const termos = gerarTermosBusca(jogo);
+
+    return termos.some((termo) => {
+      return (
+        termo.includes(busca) ||
+        busca.includes(termo)
+      );
+    });
   });
 }
