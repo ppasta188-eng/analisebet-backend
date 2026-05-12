@@ -2,6 +2,12 @@ import fs from "fs";
 
 const CAMINHO_CACHE = "./cacheJogos.json";
 
+/*
+====================================
+FUNÇÕES PRINCIPAIS
+====================================
+*/
+
 export function salvarCache(jogos) {
   fs.writeFileSync(
     CAMINHO_CACHE,
@@ -15,10 +21,19 @@ export function carregarCache() {
     return [];
   }
 
-  const dados = fs.readFileSync(CAMINHO_CACHE, "utf-8");
+  const dados = fs.readFileSync(
+    CAMINHO_CACHE,
+    "utf-8"
+  );
 
   return JSON.parse(dados);
 }
+
+/*
+====================================
+NORMALIZAÇÃO
+====================================
+*/
 
 function normalizarTexto(texto = "") {
   return texto
@@ -28,6 +43,12 @@ function normalizarTexto(texto = "") {
     .replace(/[^a-z0-9\s]/g, "")
     .trim();
 }
+
+/*
+====================================
+TERMOS DE BUSCA
+====================================
+*/
 
 function gerarTermosBusca(jogo) {
   const termos = [];
@@ -43,7 +64,12 @@ function gerarTermosBusca(jogo) {
   termos.push(esporte);
   termos.push(key);
 
-  // Brasileirão
+  /*
+  ============================
+  BRASILEIRÃO
+  ============================
+  */
+
   if (key.includes("brazil_campeonato")) {
     termos.push("brasileirao");
     termos.push("brasileirão");
@@ -53,14 +79,24 @@ function gerarTermosBusca(jogo) {
     termos.push("campeonato brasileiro");
   }
 
-  // Série B
+  /*
+  ============================
+  SÉRIE B
+  ============================
+  */
+
   if (key.includes("brazil_serie_b")) {
     termos.push("serie b");
     termos.push("série b");
     termos.push("brasil serie b");
   }
 
-  // La Liga
+  /*
+  ============================
+  LA LIGA
+  ============================
+  */
+
   if (key.includes("spain_la_liga")) {
     termos.push("la liga");
     termos.push("laliga");
@@ -68,14 +104,24 @@ function gerarTermosBusca(jogo) {
     termos.push("campeonato espanhol");
   }
 
-  // Italiano
+  /*
+  ============================
+  ITALIANO
+  ============================
+  */
+
   if (key.includes("italy_serie_a")) {
     termos.push("italiano");
     termos.push("serie a italia");
     termos.push("campeonato italiano");
   }
 
-  // Bundesliga
+  /*
+  ============================
+  BUNDESLIGA
+  ============================
+  */
+
   if (key.includes("germany_bundesliga")) {
     termos.push("bundesliga");
     termos.push("alemao");
@@ -83,7 +129,12 @@ function gerarTermosBusca(jogo) {
     termos.push("campeonato alemao");
   }
 
-  // Francês
+  /*
+  ============================
+  FRANCÊS
+  ============================
+  */
+
   if (key.includes("france_ligue_one")) {
     termos.push("ligue 1");
     termos.push("frances");
@@ -91,7 +142,12 @@ function gerarTermosBusca(jogo) {
     termos.push("campeonato frances");
   }
 
-  // Champions
+  /*
+  ============================
+  CHAMPIONS
+  ============================
+  */
+
   if (key.includes("champions")) {
     termos.push("champions");
     termos.push("liga dos campeoes");
@@ -101,6 +157,12 @@ function gerarTermosBusca(jogo) {
 
   return termos.map(normalizarTexto);
 }
+
+/*
+====================================
+BUSCA INTELIGENTE
+====================================
+*/
 
 export function buscarNoCache(textoBusca) {
   const jogos = carregarCache();
@@ -123,10 +185,20 @@ export function buscarNoCache(textoBusca) {
 }
 
 /*
-COMPATIBILIDADE COM CÓDIGOS ANTIGOS
+====================================
+COMPATIBILIDADE TOTAL
 NÃO REMOVER
+====================================
 */
 
 export function buscarJogosPorTime(textoBusca) {
   return buscarNoCache(textoBusca);
+}
+
+export function salvarJogos(jogos) {
+  return salvarCache(jogos);
+}
+
+export function carregarJogos() {
+  return carregarCache();
 }
