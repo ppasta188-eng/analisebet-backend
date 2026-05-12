@@ -1,135 +1,102 @@
 import TelegramBot from "node-telegram-bot-api";
-import express from "express";
 
 import { buscarJogos } from "./services/oddsService.js";
+import { analisarJogo } from "./services/analysisService.js";
+import {
+  salvarJogos,
+  obterJogos
+} from "./services/cacheService.js";
 
-const app = express();
-
-const PORT = process.env.PORT || 10000;
-
-const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TOKEN = process.env.TELEGRAM_TOKEN;
 
 const bot = new TelegramBot(TOKEN, {
   polling: true
 });
 
-function gerarAnalise(jogo) {
+console.log("Bot iniciado.");
+
+async function atualizarCache() {
+  console.log("=======================");
+  console.log("ATUALIZANDO CACHE...");
+  console.log("=======================");
 
   try {
+    const jogos = await buscarJogos("");
 
-    const bookmaker = jogo.bookmakers?.[0];
+    salvarJogos(jogos);
 
-    if (!bookmaker) {
-      return "⚠️ Odds indisponíveis.";
-    }
+    console.log("CACHE SALVO:");
+    console.log(jogos.length);
 
-    const market = bookmaker.markets?.[0];
-
-    if (!market) {
-      return "⚠️ Mercado indisponível.";
-    }
-
-    const outcomes = market.outcomes;
-
-    const sorted = [...outcomes].sort((a, b) => a.price - b.price);
-
-    const favorito = sorted[0];
-
-    let risco = "Alto";
-
-    if (favorito.price <= 1.70) {
-      risco = "Baixo";
-    } else if (favorito.price <= 2.20) {
-      risco = "Médio";
-    }
-
-    return `
-🧠 Análise IA:
-⭐ Favorito: ${favorito.name}
-📉 Odd favorita: ${favorito.price}
-⚠️ Risco: ${risco}
-`;
-
-  } catch {
-
-    return "⚠️ Não foi possível gerar análise.";
+  } catch (error) {
+    console.log("ERRO NO CACHE:");
+    console.log(error.message);
   }
 }
 
-bot.onText(/\/start/, (msg) => {
+atualizarCache();
 
-  bot.sendMessage(
-    msg.chat.id,
-    `🚀 Bem-vindo ao AnaliseBet IA!\n\nEnvie jogos, times ou ligas para análise.`
-  );
-});
+setInterval(() => {
+  atualizarCache();
+}, 1000 * 60 * 5);
 
 bot.on("message", async (msg) => {
-
-  if (!msg.text) return;
-
-  if (msg.text.startsWith("/")) return;
-
   const chatId = msg.chat.id;
+  const texto = msg.text;
 
-  console.log("Mensagem recebida:", msg.text);
-
-  await bot.sendMessage(
-    chatId,
-    "🔎 Buscando odds no sistema global..."
-  );
-
-  const jogos = await buscarJogos(msg.text);
-
-  if (!jogos.length) {
-
-    return bot.sendMessage(
-      chatId,
-      "❌ Nenhum jogo encontrado agora."
-    );
+  if (!texto) {
+    return;
   }
 
-  let resposta = `📊 Jogos encontrados (${jogos.length})\n\n`;
+  console.log("BUSCANDO NO CACHE:");
+  console.log(texto);
 
-  jogos.slice(0, 10).forEach((jogo) => {
+  bot.sendMessage(
+    chatId,
+    "🔎 Buscando jogos no cache local..."
+  );
 
-    const bookmaker = jogo.bookmakers?.[0];
+  const jogos = obterJogos();
 
-    if (!bookmaker) return;
+  const encontrados = jogos.filter((jogo) => {
+    const nomeJogo =
+      `${jogo.home_team} ${jogo.away_team}`.toLowerCase();
 
-    const market = bookmaker.markets?.[0];
+    return nomeJogo.includes(texto.toLowerCase());
+  });
 
-    if (!market) return;
+  if (encontrados.length === 0) {
+    bot.sendMessage(
+      chatId,
+      "❌ Nenhum jogo encontrado no cache."
+    );
 
-    const outcomes = market.outcomes;
+    return;
+  }
 
-    resposta += `⚽ ${jogo.home_team} x ${jogo.away_team}\n`;
-    resposta += `🏆 ${jogo.sport_title}\n`;
+  let resposta =
+    `📊 Jogos encontrados (${encontrados.length})\n\n`;
 
-    outcomes.forEach((o) => {
+  encontrados.forEach((jogo) => {
+    const analise = analisarJogo(jogo);
 
-      resposta += `• ${o.name}: ${o.price}\n`;
-    });
+    resposta += `
+⚽ ${jogo.home_team} x ${jogo.away_team}
+🏆 ${jogo.sport_title}
 
-    resposta += gerarAnalise(jogo);
+• ${analise.home}: ${analise.homeOdd}
+• ${analise.away}: ${analise.awayOdd}
+• Empate: ${analise.drawOdd}
 
-    resposta += `\n━━━━━━━━━━━━━━\n\n`;
+🧠 Análise IA:
+⭐ Favorito: ${analise.favorito}
+📉 Odd favorita: ${analise.oddFavorita}
+⚠️ Risco: ${analise.risco}
+
+━━━━━━━━━━━━━━━
+
+`;
   });
 
   bot.sendMessage(chatId, resposta);
-});
-
-bot.on("polling_error", (error) => {
-
-  console.log("Polling error:", error.message);
-});
-
-app.get("/", (req, res) => {
-
-  res.send("AnaliseBet IA online");
-});
-
-app.listen(PORT, () => {
-
-  console.log(`Servidor rodando na porta ${PORT}`);
 });
