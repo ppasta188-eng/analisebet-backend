@@ -30,8 +30,6 @@ const mensagensIgnoradas = [
   "bom dia",
   "boa tarde",
   "boa noite",
-  "eae",
-  "eae",
   "teste",
   "test"
 ];
@@ -45,6 +43,7 @@ async function iniciarBot() {
     await bot.setWebHook(WEBHOOK_URL);
 
     console.log("WEBHOOK ATIVADO");
+
   } catch (error) {
     console.log("ERRO WEBHOOK:");
     console.log(error.message);
@@ -76,6 +75,9 @@ bot.on("message", async (msg) => {
       return;
     }
 
+    console.log("BUSCANDO NO CACHE:");
+    console.log(texto);
+
     const resultados = buscarJogosPorTexto(texto);
 
     if (!resultados.length) {
@@ -89,8 +91,10 @@ bot.on("message", async (msg) => {
 
     const jogosLimitados = resultados.slice(0, 10);
 
-    let resposta = `🔎 Busca: ${texto}\n`;
-    resposta += `📊 Jogos encontrados: ${resultados.length}\n\n`;
+    let resposta = "";
+
+    resposta += `🔎 <b>Busca:</b> ${texto}\n`;
+    resposta += `📊 <b>Jogos encontrados:</b> ${resultados.length}\n\n`;
 
     for (const jogo of jogosLimitados) {
       const market = jogo.bookmakers?.[0]?.markets?.[0];
@@ -114,7 +118,7 @@ bot.on("message", async (msg) => {
         }
       );
 
-      resposta += `🏆 ${jogo.league}\n\n`;
+      resposta += `🏆 <b>${jogo.league}</b>\n\n`;
 
       resposta += `⚽ ${jogo.home_team} x ${jogo.away_team}\n`;
 
@@ -139,7 +143,13 @@ bot.on("message", async (msg) => {
       resposta += `⚠️ Mostrando apenas os 10 primeiros resultados.`;
     }
 
-    await bot.sendMessage(chatId, resposta);
+    await bot.sendMessage(
+      chatId,
+      resposta,
+      {
+        parse_mode: "HTML"
+      }
+    );
 
   } catch (error) {
     console.log("ERRO NO BOT:");
@@ -156,13 +166,20 @@ bot.on("message", async (msg) => {
 
 async function iniciarSistema() {
   try {
+    console.log("=======================");
+    console.log("ATUALIZANDO CACHE...");
+    console.log("=======================");
+
     const jogos = await atualizarCacheJogos();
 
-    salvarJogos(jogos);
+    if (jogos.length > 0) {
+      salvarJogos(jogos);
 
-    console.log("=======================");
-    console.log("CACHE SALVO:");
-    console.log(jogos.length);
+      console.log("=======================");
+      console.log("CACHE SALVO:");
+      console.log(jogos.length);
+      console.log("=======================");
+    }
 
     setInterval(async () => {
       try {
@@ -178,10 +195,12 @@ async function iniciarSistema() {
           console.log("=======================");
           console.log("CACHE ATUALIZADO:");
           console.log(novosJogos.length);
+          console.log("=======================");
         } else {
           console.log("=======================");
           console.log("CACHE MANTIDO");
           console.log("API RETORNOU 0 JOGOS");
+          console.log("=======================");
         }
 
       } catch (error) {
