@@ -1,13 +1,19 @@
+import {
+  gerarProbabilidades
+} from "./modelService.js";
+
 export function analisarJogo(jogo) {
-  const bookmaker = jogo.bookmakers?.[0];
+  const bookmaker =
+    jogo.bookmakers?.[0];
 
   if (!bookmaker) {
     return null;
   }
 
-  const market = bookmaker.markets?.find(
-    (m) => m.key === "h2h"
-  );
+  const market =
+    bookmaker.markets?.find(
+      (m) => m.key === "h2h"
+    );
 
   if (!market) {
     return null;
@@ -18,16 +24,20 @@ export function analisarJogo(jogo) {
   let oddFora = null;
 
   for (const outcome of market.outcomes) {
-    const nome = outcome.name.toLowerCase();
+
+    const nome =
+      outcome.name.toLowerCase();
 
     if (
-      nome === jogo.home_team.toLowerCase()
+      nome ===
+      jogo.home_team.toLowerCase()
     ) {
       oddCasa = outcome.price;
     }
 
     else if (
-      nome === jogo.away_team.toLowerCase()
+      nome ===
+      jogo.away_team.toLowerCase()
     ) {
       oddFora = outcome.price;
     }
@@ -49,19 +59,17 @@ export function analisarJogo(jogo) {
     return null;
   }
 
-  const somaProbabilidades =
-    (1 / oddCasa) +
-    (1 / oddEmpate) +
-    (1 / oddFora);
+  const probabilidades =
+    gerarProbabilidades(jogo);
 
   const probCasa =
-    (1 / oddCasa) / somaProbabilidades;
+    probabilidades.casa;
 
   const probEmpate =
-    (1 / oddEmpate) / somaProbabilidades;
+    probabilidades.empate;
 
   const probFora =
-    (1 / oddFora) / somaProbabilidades;
+    probabilidades.fora;
 
   const oddJustaCasa =
     1 / probCasa;
@@ -82,6 +90,7 @@ export function analisarJogo(jogo) {
     ((oddFora * probFora) - 1) * 100;
 
   return {
+
     casa: {
       odd: oddCasa,
       probabilidade:
