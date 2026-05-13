@@ -2,17 +2,11 @@ import express from "express";
 import TelegramBot from "node-telegram-bot-api";
 
 import {
-  buscarJogosPorTexto,
-  salvarJogos
-} from "./services/cacheService.js";
-
-import {
-  atualizarCacheJogos
+  atualizarCacheJogos,
+  buscarJogosPorTexto
 } from "./services/oddsService.js";
 
-import {
-  analisarMercado
-} from "./services/valueService.js";
+import { analisarJogo } from "./services/analysisService.js";
 
 const app = express();
 
@@ -26,19 +20,7 @@ const bot = new TelegramBot(TELEGRAM_TOKEN);
 
 const WEBHOOK_URL = `https://analisebet-backend.onrender.com/bot${TELEGRAM_TOKEN}`;
 
-const mensagensIgnoradas = [
-  "oi",
-  "ola",
-  "olá",
-  "opa",
-  "bom dia",
-  "boa tarde",
-  "boa noite",
-  "teste",
-  "test"
-];
-
-async function iniciarBot() {
+async function iniciarSistema() {
   try {
     await bot.deleteWebHook();
 
@@ -48,230 +30,149 @@ async function iniciarBot() {
 
     console.log("WEBHOOK ATIVADO");
 
-  } catch (error) {
+    await atualizarCacheJogos();
+  } catch (erro) {
+    console.log("ERRO INICIANDO SISTEMA:");
+    console.log(erro.message);
+  }
+}
+
+app.post(`/bot${TELEGRAM_TOKEN}`, async (req, res) => {
+  try {
+    bot.processUpdate(req.body);
+
+    res.sendStatus(200);
+  } catch (erro) {
     console.log("ERRO WEBHOOK:");
-    console.log(error.message);
+    console.log(erro.message);
+
+    res.sendStatus(500);
   }
-}
-
-app.post(`/bot${TELEGRAM_TOKEN}`, (req, res) => {
-  bot.processUpdate(req.body);
-
-  res.sendStatus(200);
 });
-
-function traduzirLiga(nomeLiga) {
-  return nomeLiga
-    .replace("Brazil", "Brasil")
-    .replace("Spain", "Espanha")
-    .replace("Germany", "Alemanha")
-    .replace("Italy", "Itália")
-    .replace("France", "França");
-}
-
-function gerarMensagemValor(nomeTime, valorEsperado) {
-  if (valorEsperado >= 8) {
-    return `🔥 Forte valor encontrado para ${nomeTime}`;
-  }
-
-  if (valorEsperado >= 4) {
-    return `✅ Boa oportunidade para ${nomeTime}`;
-  }
-
-  if (valorEsperado >= 0) {
-    return `⚖️ Mercado equilibrado para ${nomeTime}`;
-  }
-
-  return `❌ Sem valor para ${nomeTime}`;
-}
 
 bot.on("message", async (msg) => {
   try {
     const chatId = msg.chat.id;
 
-    const texto = (msg.text || "").trim();
+    const texto = msg.text;
 
     if (!texto) {
-      return;
-    }
-
-    const textoNormalizado = texto
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLowerCase();
-
-    if (mensagensIgnoradas.includes(textoNormalizado)) {
       return;
     }
 
     console.log("BUSCANDO NO CACHE:");
     console.log(texto);
 
-    const resultados = buscarJogosPorTexto(texto);
+    const textoLimpo = texto.trim().toLowerCase();
 
-    if (!resultados.length) {
+    if (
+      textoLimpo === "oi" ||
+      textoLimpo === "olá" ||
+      textoLimpo === "ola" ||
+      textoLimpo === "bom dia" ||
+      textoLimpo === "boa tarde" ||
+      textoLimpo === "boa noite"
+    ) {
       await bot.sendMessage(
         chatId,
-        `❌ Nenhum jogo encontrado para:\n\n${texto}`
+        "👋 Olá! Envie o nome de um time, campeonato ou país.\n\nExemplos:\n- Bahia\n- Brasileirão\n- Flamengo\n- Espanha"
       );
 
       return;
     }
 
-    const jogosLimitados = resultados.slice(0, 10);
+    const jogos = buscarJogosPorTexto(texto);
 
-    let resposta = "";
+    if (!jogos.length) {
+      await bot.sendMessage(
+        chatId,
+        `❌ Nenhum jogo encontrado para: ${texto}`
+      );
 
-    resposta += `🔎 <b>Busca:</b> ${texto}\n`;
-    resposta += `📊 <b>Jogos encontrados:</b> ${resultados.length}\n\n`;
+      return;
+    }
+
+    let mensagem = "";
+
+    mensagem += `🔎 Busca: ${texto}\n`;
+    mensagem += `📊 Jogos encontrados: ${jogos.length}\n\n`;
+
+    const jogosLimitados = jogos.slice(0, 10);
 
     for (const jogo of jogosLimitados) {
-      const market = jogo.bookmakers?.[0]?.markets?.[0];
+      const oddCasa =
+        jogo.bookmakers?.[0]?.markets?.[0]?.outcomes?.[0]?.price;
 
-      const casa = market?.outcomes?.find(
-        (o) => o.name === jogo.home_team
-      );
+      const oddEmpate =
+        jogo.bookmakers?.[0]?.markets?.[0]?.outcomes?.[1]?.price;
 
-      const empate = market?.outcomes?.find(
-        (o) => o.name.toLowerCase() === "draw"
-      );
+      const oddFora =
+        jogo.bookmakers?.[0]?.markets?.[0]?.outcomes?.[2]?.price;
 
-      const fora = market?.outcomes?.find(
-        (o) => o.name === jogo.away_team
-      );
+      if (!oddCasa || !oddEmpate || !oddFora) {
+        continue;
+      }
 
-      const horario = new Date(jogo.commence_time).toLocaleString(
-        "pt-BR",
-        {
+      const analise = analisarJogo(jogo);
+
+      if (!analise) {
+        continue;
+      }
+
+      const data = new Date(jogo.commence_time);
+
+      const dataFormatada =
+        data.toLocaleString("pt-BR", {
           timeZone: "America/Sao_Paulo"
-        }
-      );
+        });
 
-      const analise = analisarMercado(
-        casa,
-        empate,
-        fora,
-        jogo
-      );
+      mensagem += `
+🏆 ${jogo.sport_title.replace("Brazil", "Brasil")}
 
-      resposta += `🏆 <b>${traduzirLiga(jogo.league)}</b>\n\n`;
+⚽ ${jogo.home_team} x ${jogo.away_team}
+🕒 ${dataFormatada}
 
-      resposta += `⚽ ${jogo.home_team} x ${jogo.away_team}\n`;
+🏠 ${jogo.home_team}: ${oddCasa}
+📊 Chance estimada: ${(analise.probabilidades.casa * 100).toFixed(1)}%
+🎯 Odd justa: ${analise.oddsJustas.casa.toFixed(2)}
+💰 Valor esperado: ${analise.valorEsperado.casa.toFixed(1)}%
+${analise.classificacao.casa}
 
-      resposta += `🕒 ${horario}\n\n`;
+🤝 Empate: ${oddEmpate}
+📊 Chance estimada: ${(analise.probabilidades.empate * 100).toFixed(1)}%
+🎯 Odd justa: ${analise.oddsJustas.empate.toFixed(2)}
+💰 Valor esperado: ${analise.valorEsperado.empate.toFixed(1)}%
+${analise.classificacao.empate}
 
-      if (casa && analise) {
-        resposta += `🏠 ${jogo.home_team}: ${casa.price}\n`;
-        resposta += `📊 Chance estimada: ${(analise.casa.prob * 100).toFixed(1)}%\n`;
-        resposta += `🎯 Odd justa: ${analise.casa.oddJusta.toFixed(2)}\n`;
-        resposta += `💰 Valor esperado: ${analise.casa.valorEsperado.toFixed(1)}%\n`;
-        resposta += `${gerarMensagemValor(
-          jogo.home_team,
-          analise.casa.valorEsperado
-        )}\n\n`;
-      }
+✈️ ${jogo.away_team}: ${oddFora}
+📊 Chance estimada: ${(analise.probabilidades.fora * 100).toFixed(1)}%
+🎯 Odd justa: ${analise.oddsJustas.fora.toFixed(2)}
+💰 Valor esperado: ${analise.valorEsperado.fora.toFixed(1)}%
+${analise.classificacao.fora}
 
-      if (empate && analise) {
-        resposta += `🤝 Empate: ${empate.price}\n`;
-        resposta += `📊 Chance estimada: ${(analise.empate.prob * 100).toFixed(1)}%\n`;
-        resposta += `🎯 Odd justa: ${analise.empate.oddJusta.toFixed(2)}\n`;
-        resposta += `💰 Valor esperado: ${analise.empate.valorEsperado.toFixed(1)}%\n\n`;
-      }
+━━━━━━━━━━━━━━━
 
-      if (fora && analise) {
-        resposta += `✈️ ${jogo.away_team}: ${fora.price}\n`;
-        resposta += `📊 Chance estimada: ${(analise.fora.prob * 100).toFixed(1)}%\n`;
-        resposta += `🎯 Odd justa: ${analise.fora.oddJusta.toFixed(2)}\n`;
-        resposta += `💰 Valor esperado: ${analise.fora.valorEsperado.toFixed(1)}%\n`;
-        resposta += `${gerarMensagemValor(
-          jogo.away_team,
-          analise.fora.valorEsperado
-        )}\n`;
-      }
-
-      resposta += `\n━━━━━━━━━━━━━━━\n\n`;
+`;
     }
 
-    if (resultados.length > 10) {
-      resposta += `⚠️ Mostrando apenas os 10 primeiros resultados.`;
+    if (jogos.length > 10) {
+      mensagem += "⚠️ Mostrando apenas os 10 primeiros resultados.";
     }
+
+    await bot.sendMessage(chatId, mensagem);
+  } catch (erro) {
+    console.log("ERRO NO BOT:");
+    console.log(erro);
 
     await bot.sendMessage(
-      chatId,
-      resposta,
-      {
-        parse_mode: "HTML"
-      }
+      msg.chat.id,
+      "❌ Ocorreu um erro ao processar sua busca."
     );
-
-  } catch (error) {
-    console.log("ERRO NO BOT:");
-    console.log(error);
-
-    try {
-      await bot.sendMessage(
-        msg.chat.id,
-        "❌ Erro interno ao buscar jogos."
-      );
-    } catch {}
   }
 });
 
-async function iniciarSistema() {
-  try {
-    console.log("=======================");
-    console.log("ATUALIZANDO CACHE...");
-    console.log("=======================");
-
-    const jogos = await atualizarCacheJogos();
-
-    if (jogos.length > 0) {
-      salvarJogos(jogos);
-
-      console.log("=======================");
-      console.log("CACHE SALVO:");
-      console.log(jogos.length);
-      console.log("=======================");
-    }
-
-    setInterval(async () => {
-      try {
-        console.log("=======================");
-        console.log("ATUALIZANDO CACHE...");
-        console.log("=======================");
-
-        const novosJogos = await atualizarCacheJogos();
-
-        if (novosJogos.length > 0) {
-          salvarJogos(novosJogos);
-
-          console.log("=======================");
-          console.log("CACHE ATUALIZADO:");
-          console.log(novosJogos.length);
-          console.log("=======================");
-        } else {
-          console.log("=======================");
-          console.log("CACHE MANTIDO");
-          console.log("API RETORNOU 0 JOGOS");
-          console.log("=======================");
-        }
-
-      } catch (error) {
-        console.log("ERRO ATUALIZANDO CACHE:");
-        console.log(error.message);
-      }
-    }, 1000 * 60 * 15);
-
-    await iniciarBot();
-
-  } catch (error) {
-    console.log("ERRO INICIANDO SISTEMA:");
-    console.log(error.message);
-  }
-}
-
 app.get("/", (req, res) => {
-  res.send("AnaliseBet IA Online");
+  res.send("AnaliseBet IA online.");
 });
 
 app.listen(PORT, async () => {
