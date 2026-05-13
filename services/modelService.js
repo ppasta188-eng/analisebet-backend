@@ -1,83 +1,103 @@
-const FORCA_TIMES = {
-  "Flamengo": 92,
-  "Palmeiras": 91,
-  "Botafogo": 84,
-  "Bahia": 78,
-  "Grêmio": 77,
-  "Corinthians": 80,
-  "Santos": 76,
-  "São Paulo": 83,
-  "Sao Paulo": 83,
-  "Internacional": 82,
-  "Cruzeiro": 79,
-  "Fluminense": 81,
-  "Vasco da Gama": 74,
-  "Vasco": 74,
-  "Coritiba": 69,
-  "Vitória": 68,
-  "Vitoria": 68,
-  "Mirassol": 65,
-  "Bragantino-SP": 78,
-  "Athletico Paranaense": 82,
-  "Atletico Paranaense": 82,
-  "Atlético Mineiro": 85,
-  "Atletico Mineiro": 85,
-  "Chapecoense": 67,
-  "Remo": 66
-};
+export function calcularProbabilidades(
+  oddCasa,
+  oddEmpate,
+  oddFora,
+  forcaCasa = 0,
+  forcaFora = 0
+) {
+  const probCasaBase = 1 / oddCasa;
+  const probEmpateBase = 1 / oddEmpate;
+  const probForaBase = 1 / oddFora;
 
-function obterForca(time) {
-  return FORCA_TIMES[time] || 70;
-}
-
-export function gerarProbabilidades(jogo) {
-  const timeCasa =
-    jogo.home_team;
-
-  const timeFora =
-    jogo.away_team;
-
-  const forcaCasa =
-    obterForca(timeCasa) + 5;
-
-  const forcaFora =
-    obterForca(timeFora);
-
-  const total =
-    forcaCasa + forcaFora;
+  const somaBase =
+    probCasaBase +
+    probEmpateBase +
+    probForaBase;
 
   let probCasa =
-    (forcaCasa / total);
+    probCasaBase / somaBase;
 
   let probFora =
-    (forcaFora / total);
+    probForaBase / somaBase;
 
-  let probEmpate =
-    0.24;
+  const diferenca =
+    Math.abs(
+      forcaCasa - forcaFora
+    );
 
-  probCasa =
-    probCasa * (1 - probEmpate);
+  let probEmpate = 0.28;
 
-  probFora =
-    probFora * (1 - probEmpate);
+  if (diferenca >= 5) {
+    probEmpate = 0.25;
+  }
 
-  const soma =
+  if (diferenca >= 10) {
+    probEmpate = 0.22;
+  }
+
+  if (diferenca >= 15) {
+    probEmpate = 0.19;
+  }
+
+  const ajusteForca =
+    (forcaCasa - forcaFora) / 100;
+
+  probCasa += ajusteForca;
+  probFora -= ajusteForca;
+
+  if (probCasa < 0.05) {
+    probCasa = 0.05;
+  }
+
+  if (probFora < 0.05) {
+    probFora = 0.05;
+  }
+
+  const somaFinal =
     probCasa +
     probEmpate +
     probFora;
 
   probCasa =
-    probCasa / soma;
+    probCasa / somaFinal;
 
   probEmpate =
-    probEmpate / soma;
+    probEmpate / somaFinal;
 
   probFora =
-    probFora / soma;
+    probFora / somaFinal;
 
   return {
-    casa: probCasa,
-    empate: probEmpate,
-    fora: probFora
+    casa: {
+      probabilidade: probCasa,
+      oddJusta:
+        1 / probCasa,
+      valorEsperado:
+        oddCasa *
+          probCasa -
+        1
+    },
+
+    empate: {
+      probabilidade:
+        probEmpate,
+      oddJusta:
+        1 / probEmpate,
+      valorEsperado:
+        oddEmpate *
+          probEmpate -
+        1
+    },
+
+    fora: {
+      probabilidade:
+        probFora,
+      oddJusta:
+        1 / probFora,
+      valorEsperado:
+        oddFora *
+          probFora -
+        1
+    }
   };
 }
