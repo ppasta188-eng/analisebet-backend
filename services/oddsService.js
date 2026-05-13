@@ -1,11 +1,6 @@
 import axios from "axios";
 
-import {
-  salvarJogos,
-  buscarJogosPorTexto
-} from "./cacheService.js";
-
-const ODDS_API_KEY = process.env.ODDS_API_KEY;
+const API_KEY = process.env.ODDS_API_KEY;
 
 const esportes = [
   "soccer_brazil_campeonato",
@@ -19,98 +14,60 @@ const esportes = [
 
 export async function atualizarCacheJogos() {
   try {
-    console.log("=======================");
-    console.log("ATUALIZANDO CACHE...");
-    console.log("=======================");
-
-    let jogosFinais = [];
+    let todosJogos = [];
 
     for (const esporte of esportes) {
       try {
         console.log("===============================");
         console.log(`CONSULTANDO: ${esporte}`);
 
-        const url = `https://api.the-odds-api.com/v4/sports/${esporte}/odds`;
-
-        const response = await axios.get(url, {
-          params: {
-            apiKey: ODDS_API_KEY,
-            regions: "us,eu",
-            markets: "h2h",
-            oddsFormat: "decimal"
+        const response = await axios.get(
+          `https://api.the-odds-api.com/v4/sports/${esporte}/odds`,
+          {
+            params: {
+              apiKey: API_KEY,
+              regions: "us",
+              markets: "h2h",
+              oddsFormat: "decimal"
+            }
           }
-        });
+        );
 
         const jogos = response.data || [];
 
         console.log(`ENCONTRADOS: ${jogos.length}`);
 
-        const formatados = jogos.map((jogo) => {
-          let homeOdd = "-";
-          let drawOdd = "-";
-          let awayOdd = "-";
+        const jogosFormatados = jogos.map((jogo) => ({
+          home_team: jogo.home_team || "",
+          away_team: jogo.away_team || "",
+          league: jogo.sport_title || esporte,
+          commence_time: jogo.commence_time || "",
+          bookmakers: jogo.bookmakers || []
+        }));
 
-          const bookmaker = jogo.bookmakers?.[0];
+        todosJogos.push(...jogosFormatados);
 
-          const market = bookmaker?.markets?.find(
-            (m) => m.key === "h2h"
-          );
-
-          if (market?.outcomes) {
-            market.outcomes.forEach((o) => {
-              if (o.name === jogo.home_team) {
-                homeOdd = o.price;
-              } else if (o.name === jogo.away_team) {
-                awayOdd = o.price;
-              } else {
-                drawOdd = o.price;
-              }
-            });
-          }
-
-          return {
-            league: jogo.sport_title,
-            home_team: jogo.home_team,
-            away_team: jogo.away_team,
-            home_odd: homeOdd,
-            draw_odd: drawOdd,
-            away_odd: awayOdd
-          };
-        });
-
-        jogosFinais.push(...formatados);
-
-      } catch (erroEsporte) {
+      } catch (error) {
         console.log(`ERRO NO ESPORTE: ${esporte}`);
 
-        if (erroEsporte.response?.data) {
-          console.log(erroEsporte.response.data);
+        if (error.response?.data) {
+          console.log(error.response.data);
         } else {
-          console.log(erroEsporte.message);
+          console.log(error.message);
         }
       }
     }
 
     console.log("===============================");
-    console.log(`TOTAL FINAL: ${jogosFinais.length}`);
+    console.log(`TOTAL FINAL: ${todosJogos.length}`);
     console.log("===============================");
 
-    if (jogosFinais.length > 0) {
-      salvarJogos(jogosFinais);
-
-      console.log("=======================");
-      console.log("CACHE SALVO:");
-      console.log(jogosFinais.length);
-    } else {
-      console.log("=======================");
-      console.log("CACHE MANTIDO");
-      console.log("API RETORNOU 0 JOGOS");
-    }
+    return todosJogos;
 
   } catch (error) {
-    console.log("ERRO GERAL:");
+    console.log("ERRO GERAL ODDS SERVICE:");
     console.log(error.message);
+
+    return [];
   }
 }
-
-export { buscarJogosPorTexto };
