@@ -1,7 +1,9 @@
-import TelegramBot from "node-telegram-bot-api";
 import express from "express";
+import TelegramBot from "node-telegram-bot-api";
 
 const app = express();
+
+app.use(express.json());
 
 const PORT = process.env.PORT || 10000;
 
@@ -12,45 +14,38 @@ if (!TELEGRAM_TOKEN) {
   process.exit(1);
 }
 
-const bot = new TelegramBot(TELEGRAM_TOKEN, {
-  polling: {
-    autoStart: false,
-    interval: 3000,
-    params: {
-      timeout: 10,
-    },
-  },
-});
+const URL_RENDER =
+  "https://analisebet-backend.onrender.com";
 
-async function iniciarBot() {
+const bot = new TelegramBot(TELEGRAM_TOKEN);
+
+async function iniciarWebhook() {
   try {
     await bot.deleteWebHook({
       drop_pending_updates: true,
     });
 
-    console.log("WEBHOOK REMOVIDO");
+    console.log("WEBHOOK ANTIGO REMOVIDO");
 
-    await bot.startPolling();
+    await bot.setWebHook(
+      `${URL_RENDER}/bot${TELEGRAM_TOKEN}`
+    );
 
-    console.log("BOT POLLING INICIADO");
+    console.log("WEBHOOK ATIVADO");
   } catch (erro) {
-    console.log("ERRO AO INICIAR BOT:");
+    console.log("ERRO WEBHOOK:");
     console.log(erro.message);
   }
 }
 
-bot.on("polling_error", async (erro) => {
-  console.log("POLLING ERROR:");
-  console.log(erro.message);
-
-  // IGNORA COMPLETAMENTE 409
-  if (erro.message.includes("409")) {
-    return;
-  }
-});
-
-bot.on("message", async (msg) => {
+app.post(`/bot${TELEGRAM_TOKEN}`, async (req, res) => {
   try {
+    const msg = req.body.message;
+
+    if (!msg) {
+      return res.sendStatus(200);
+    }
+
     const chatId = msg.chat.id;
 
     const texto = msg.text || "";
@@ -62,9 +57,13 @@ bot.on("message", async (msg) => {
       chatId,
       `Você buscou: ${texto}`
     );
+
+    res.sendStatus(200);
   } catch (erro) {
     console.log("ERRO GERAL:");
     console.log(erro.message);
+
+    res.sendStatus(200);
   }
 });
 
@@ -75,5 +74,5 @@ app.get("/", (req, res) => {
 app.listen(PORT, async () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 
-  await iniciarBot();
+  await iniciarWebhook();
 });
