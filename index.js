@@ -22,6 +22,20 @@ const bot = new TelegramBot(TELEGRAM_TOKEN);
 
 const WEBHOOK_URL = `https://analisebet-backend.onrender.com/bot${TELEGRAM_TOKEN}`;
 
+const mensagensIgnoradas = [
+  "oi",
+  "ola",
+  "olá",
+  "opa",
+  "bom dia",
+  "boa tarde",
+  "boa noite",
+  "eae",
+  "eae",
+  "teste",
+  "test"
+];
+
 async function iniciarBot() {
   try {
     await bot.deleteWebHook();
@@ -47,9 +61,18 @@ bot.on("message", async (msg) => {
   try {
     const chatId = msg.chat.id;
 
-    const texto = msg.text || "";
+    const texto = (msg.text || "").trim();
 
-    if (!texto.trim()) {
+    if (!texto) {
+      return;
+    }
+
+    const textoNormalizado = texto
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+
+    if (mensagensIgnoradas.includes(textoNormalizado)) {
       return;
     }
 
@@ -70,19 +93,26 @@ bot.on("message", async (msg) => {
     resposta += `📊 Jogos encontrados: ${resultados.length}\n\n`;
 
     for (const jogo of jogosLimitados) {
-      const casa = jogo.bookmakers?.[0]?.markets?.[0]?.outcomes?.find(
+      const market = jogo.bookmakers?.[0]?.markets?.[0];
+
+      const casa = market?.outcomes?.find(
         (o) => o.name === jogo.home_team
       );
 
-      const empate = jogo.bookmakers?.[0]?.markets?.[0]?.outcomes?.find(
+      const empate = market?.outcomes?.find(
         (o) => o.name.toLowerCase() === "draw"
       );
 
-      const fora = jogo.bookmakers?.[0]?.markets?.[0]?.outcomes?.find(
+      const fora = market?.outcomes?.find(
         (o) => o.name === jogo.away_team
       );
 
-      const horario = new Date(jogo.commence_time).toLocaleString("pt-BR");
+      const horario = new Date(jogo.commence_time).toLocaleString(
+        "pt-BR",
+        {
+          timeZone: "America/Sao_Paulo"
+        }
+      );
 
       resposta += `🏆 ${jogo.league}\n\n`;
 
@@ -110,6 +140,7 @@ bot.on("message", async (msg) => {
     }
 
     await bot.sendMessage(chatId, resposta);
+
   } catch (error) {
     console.log("ERRO NO BOT:");
     console.log(error);
@@ -152,6 +183,7 @@ async function iniciarSistema() {
           console.log("CACHE MANTIDO");
           console.log("API RETORNOU 0 JOGOS");
         }
+
       } catch (error) {
         console.log("ERRO ATUALIZANDO CACHE:");
         console.log(error.message);
@@ -159,6 +191,7 @@ async function iniciarSistema() {
     }, 1000 * 60 * 15);
 
     await iniciarBot();
+
   } catch (error) {
     console.log("ERRO INICIANDO SISTEMA:");
     console.log(error.message);
