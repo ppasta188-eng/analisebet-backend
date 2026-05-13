@@ -15,45 +15,32 @@ function gerarTextoBusca(jogo) {
 
   let extra = "";
 
-  // aliases Brasil
-  if (
-    league.includes("brazil") ||
-    league.includes("serie a") ||
-    league.includes("serie b")
-  ) {
+  if (league.includes("brazil")) {
     extra += " brasil brasileirao brasileirão copa do brasil ";
   }
 
-  // aliases Espanha
-  if (
-    league.includes("spain") ||
-    league.includes("la liga")
-  ) {
-    extra += " espanha laliga la liga ";
+  if (league.includes("serie a")) {
+    extra += " brasileirao brasileirão ";
   }
 
-  // aliases Alemanha
-  if (
-    league.includes("bundesliga") ||
-    league.includes("germany")
-  ) {
+  if (league.includes("serie b")) {
+    extra += " brasileirão serie b ";
+  }
+
+  if (league.includes("la liga")) {
+    extra += " espanha la liga laliga ";
+  }
+
+  if (league.includes("bundesliga")) {
     extra += " alemanha bundesliga ";
   }
 
-  // aliases Itália
-  if (
-    league.includes("italy") ||
-    league.includes("serie a")
-  ) {
+  if (league.includes("italy")) {
     extra += " italia italiano ";
   }
 
-  // aliases França
-  if (
-    league.includes("france") ||
-    league.includes("ligue")
-  ) {
-    extra += " franca francês ligue ";
+  if (league.includes("france")) {
+    extra += " franca francês ";
   }
 
   return `
@@ -65,7 +52,7 @@ function gerarTextoBusca(jogo) {
 }
 
 export function salvarJogos(jogos) {
-  cacheJogos = jogos || [];
+  cacheJogos = Array.isArray(jogos) ? jogos : [];
 }
 
 export function buscarTodosJogos() {
@@ -79,8 +66,13 @@ export function buscarJogosPorTexto(textoBusca) {
   const busca = normalizarTexto(textoBusca);
 
   return cacheJogos.filter((jogo) => {
-    const textoCompleto = gerarTextoBusca(jogo);
+    try {
+      const textoCompleto = gerarTextoBusca(jogo);
 
-    return textoCompleto.includes(busca);
+      return textoCompleto.includes(busca);
+
+    } catch (error) {
+      return false;
+    }
   });
 }
