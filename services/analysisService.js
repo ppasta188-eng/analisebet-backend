@@ -2,123 +2,133 @@ import {
   gerarProbabilidades
 } from "./modelService.js";
 
-export function analisarJogo(jogo) {
-  const bookmaker =
-    jogo.bookmakers?.[0];
-
-  if (!bookmaker) {
-    return null;
-  }
-
-  const market =
-    bookmaker.markets?.find(
-      (m) => m.key === "h2h"
-    );
-
-  if (!market) {
-    return null;
-  }
-
-  let oddCasa = null;
-  let oddEmpate = null;
-  let oddFora = null;
-
-  for (const outcome of market.outcomes) {
-
-    const nome =
-      outcome.name.toLowerCase();
-
-    if (
-      nome ===
-      jogo.home_team.toLowerCase()
-    ) {
-      oddCasa = outcome.price;
-    }
-
-    else if (
-      nome ===
-      jogo.away_team.toLowerCase()
-    ) {
-      oddFora = outcome.price;
-    }
-
-    else if (
-      nome.includes("draw") ||
-      nome.includes("tie") ||
-      nome.includes("empate")
-    ) {
-      oddEmpate = outcome.price;
-    }
-  }
+export function analisarJogo(
+  jogo
+) {
+  const odds =
+    jogo.bookmakers?.[0]
+      ?.markets?.[0]
+      ?.outcomes;
 
   if (
-    !oddCasa ||
-    !oddEmpate ||
-    !oddFora
+    !odds ||
+    odds.length < 3
   ) {
     return null;
   }
 
-  const probabilidades =
-    gerarProbabilidades(jogo);
+  const casa =
+    odds.find(
+      (o) =>
+        o.name ===
+        jogo.home_team
+    );
 
-  const probCasa =
-    probabilidades.casa;
+  const fora =
+    odds.find(
+      (o) =>
+        o.name ===
+        jogo.away_team
+    );
 
-  const probEmpate =
-    probabilidades.empate;
+  const empate =
+    odds.find(
+      (o) =>
+        o.name === "Draw"
+    );
 
-  const probFora =
-    probabilidades.fora;
+  if (
+    !casa ||
+    !fora ||
+    !empate
+  ) {
+    return null;
+  }
 
-  const oddJustaCasa =
-    1 / probCasa;
-
-  const oddJustaEmpate =
-    1 / probEmpate;
-
-  const oddJustaFora =
-    1 / probFora;
-
-  const evCasa =
-    ((oddCasa * probCasa) - 1) * 100;
-
-  const evEmpate =
-    ((oddEmpate * probEmpate) - 1) * 100;
-
-  const evFora =
-    ((oddFora * probFora) - 1) * 100;
+  const analise =
+    gerarProbabilidades(
+      casa.price,
+      empate.price,
+      fora.price
+    );
 
   return {
-
     casa: {
-      odd: oddCasa,
-      probabilidade:
-        (probCasa * 100).toFixed(1),
+      time:
+        jogo.home_team,
+
+      odd:
+        casa.price,
+
+      chance:
+        (
+          analise.casa
+            .probabilidade *
+          100
+        ).toFixed(1),
+
       oddJusta:
-        oddJustaCasa.toFixed(2),
-      ev:
-        evCasa.toFixed(1)
+        analise.casa.oddJusta.toFixed(
+          2
+        ),
+
+      valorEsperado:
+        (
+          analise.casa
+            .valorEsperado *
+          100
+        ).toFixed(1)
     },
 
     empate: {
-      odd: oddEmpate,
-      probabilidade:
-        (probEmpate * 100).toFixed(1),
+      odd:
+        empate.price,
+
+      chance:
+        (
+          analise.empate
+            .probabilidade *
+          100
+        ).toFixed(1),
+
       oddJusta:
-        oddJustaEmpate.toFixed(2),
-      ev:
-        evEmpate.toFixed(1)
+        analise.empate.oddJusta.toFixed(
+          2
+        ),
+
+      valorEsperado:
+        (
+          analise.empate
+            .valorEsperado *
+          100
+        ).toFixed(1)
     },
 
     fora: {
-      odd: oddFora,
-      probabilidade:
-        (probFora * 100).toFixed(1),
+      time:
+        jogo.away_team,
+
+      odd:
+        fora.price,
+
+      chance:
+        (
+          analise.fora
+            .probabilidade *
+          100
+        ).toFixed(1),
+
       oddJusta:
-        oddJustaFora.toFixed(2),
-      ev:
-        evFora.toFixed(1)
+        analise.fora.oddJusta.toFixed(
+          2
+        ),
+
+      valorEsperado:
+        (
+          analise.fora
+            .valorEsperado *
+          100
+        ).toFixed(1)
     }
   };
 }
