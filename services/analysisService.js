@@ -1,134 +1,69 @@
-import {
-  gerarProbabilidades
-} from "./modelService.js";
-
-export function analisarJogo(
-  jogo
-) {
-  const odds =
-    jogo.bookmakers?.[0]
-      ?.markets?.[0]
-      ?.outcomes;
+export function analisarOdds(odds) {
+  const oddCasa = Number(odds?.casa);
+  const oddEmpate = Number(odds?.empate);
+  const oddFora = Number(odds?.fora);
 
   if (
-    !odds ||
-    odds.length < 3
+    !oddCasa ||
+    !oddEmpate ||
+    !oddFora
   ) {
     return null;
   }
 
-  const casa =
-    odds.find(
-      (o) =>
-        o.name ===
-        jogo.home_team
-    );
+  const probCasaBruta = 1 / oddCasa;
+  const probEmpateBruta = 1 / oddEmpate;
+  const probForaBruta = 1 / oddFora;
 
-  const fora =
-    odds.find(
-      (o) =>
-        o.name ===
-        jogo.away_team
-    );
+  const soma =
+    probCasaBruta +
+    probEmpateBruta +
+    probForaBruta;
 
-  const empate =
-    odds.find(
-      (o) =>
-        o.name === "Draw"
-    );
+  const probCasa =
+    (probCasaBruta / soma) * 100;
 
-  if (
-    !casa ||
-    !fora ||
-    !empate
-  ) {
-    return null;
-  }
+  const probEmpate =
+    (probEmpateBruta / soma) * 100;
 
-  const analise =
-    gerarProbabilidades(
-      casa.price,
-      empate.price,
-      fora.price
-    );
+  const probFora =
+    (probForaBruta / soma) * 100;
+
+  const oddJustaCasa =
+    100 / probCasa;
+
+  const oddJustaEmpate =
+    100 / probEmpate;
+
+  const oddJustaFora =
+    100 / probFora;
+
+  const evCasa =
+    ((oddCasa / oddJustaCasa) - 1) * 100;
+
+  const evEmpate =
+    ((oddEmpate / oddJustaEmpate) - 1) * 100;
+
+  const evFora =
+    ((oddFora / oddJustaFora) - 1) * 100;
 
   return {
     casa: {
-      time:
-        jogo.home_team,
-
-      odd:
-        casa.price,
-
-      chance:
-        (
-          analise.casa
-            .probabilidade *
-          100
-        ).toFixed(1),
-
-      oddJusta:
-        analise.casa.oddJusta.toFixed(
-          2
-        ),
-
-      valorEsperado:
-        (
-          analise.casa
-            .valorEsperado *
-          100
-        ).toFixed(1)
+      probabilidade: probCasa.toFixed(1),
+      oddJusta: oddJustaCasa.toFixed(2),
+      ev: evCasa.toFixed(1)
     },
 
     empate: {
-      odd:
-        empate.price,
-
-      chance:
-        (
-          analise.empate
-            .probabilidade *
-          100
-        ).toFixed(1),
-
-      oddJusta:
-        analise.empate.oddJusta.toFixed(
-          2
-        ),
-
-      valorEsperado:
-        (
-          analise.empate
-            .valorEsperado *
-          100
-        ).toFixed(1)
+      probabilidade: probEmpate.toFixed(1),
+      oddJusta: oddJustaEmpate.toFixed(2),
+      ev: evEmpate.toFixed(1)
     },
 
     fora: {
-      time:
-        jogo.away_team,
-
-      odd:
-        fora.price,
-
-      chance:
-        (
-          analise.fora
-            .probabilidade *
-          100
-        ).toFixed(1),
-
-      oddJusta:
-        analise.fora.oddJusta.toFixed(
-          2
-        ),
-
-      valorEsperado:
-        (
-          analise.fora
-            .valorEsperado *
-          100
-        ).toFixed(1)
+      probabilidade: probFora.toFixed(1),
+      oddJusta: oddJustaFora.toFixed(2),
+      ev: evFora.toFixed(1)
     }
   };
 }
