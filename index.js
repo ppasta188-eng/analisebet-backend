@@ -13,37 +13,28 @@ if (!TELEGRAM_TOKEN) {
 }
 
 const bot = new TelegramBot(TELEGRAM_TOKEN, {
-  polling: false,
+  polling: {
+    autoStart: false,
+    interval: 3000,
+    params: {
+      timeout: 10,
+    },
+  },
 });
 
-let pollingAtivo = false;
-
 async function iniciarBot() {
-  if (pollingAtivo) {
-    console.log("POLLING JÁ ESTÁ ATIVO");
-    return;
-  }
-
   try {
-    pollingAtivo = true;
-
     await bot.deleteWebHook({
       drop_pending_updates: true,
     });
 
-    try {
-      await bot.stopPolling();
-    } catch {}
+    console.log("WEBHOOK REMOVIDO");
 
-    await bot.startPolling({
-      restart: false,
-    });
+    await bot.startPolling();
 
     console.log("BOT POLLING INICIADO");
   } catch (erro) {
-    pollingAtivo = false;
-
-    console.log("ERRO AO INICIAR POLLING:");
+    console.log("ERRO AO INICIAR BOT:");
     console.log(erro.message);
   }
 }
@@ -52,29 +43,29 @@ bot.on("polling_error", async (erro) => {
   console.log("POLLING ERROR:");
   console.log(erro.message);
 
+  // IGNORA COMPLETAMENTE 409
   if (erro.message.includes("409")) {
-    console.log("CONFLITO 409 IGNORADO");
     return;
   }
-
-  pollingAtivo = false;
-
-  try {
-    await bot.stopPolling();
-  } catch {}
-
-  setTimeout(async () => {
-    await iniciarBot();
-  }, 5000);
 });
 
 bot.on("message", async (msg) => {
-  const chatId = msg.chat.id;
+  try {
+    const chatId = msg.chat.id;
 
-  await bot.sendMessage(
-    chatId,
-    "Bot funcionando normalmente."
-  );
+    const texto = msg.text || "";
+
+    console.log("BUSCANDO NO CACHE:");
+    console.log(texto);
+
+    await bot.sendMessage(
+      chatId,
+      `Você buscou: ${texto}`
+    );
+  } catch (erro) {
+    console.log("ERRO GERAL:");
+    console.log(erro.message);
+  }
 });
 
 app.get("/", (req, res) => {
