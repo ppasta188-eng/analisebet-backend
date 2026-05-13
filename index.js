@@ -1,78 +1,96 @@
 import express from "express";
 import TelegramBot from "node-telegram-bot-api";
 
+import {
+  atualizarCacheJogos,
+} from "./services/apiService.js";
+
+import {
+  salvarJogos,
+  buscarJogosPorTexto,
+  formatarMensagemJogos,
+} from "./services/cacheService.js";
+
 const app = express();
 
 app.use(express.json());
 
 const PORT = process.env.PORT || 10000;
 
-const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
+const token = process.env.TELEGRAM_TOKEN;
 
-if (!TELEGRAM_TOKEN) {
-  console.log("TOKEN TELEGRAM NÃO CONFIGURADO");
-  process.exit(1);
-}
+const bot = new TelegramBot(token);
 
-const URL_RENDER =
-  "https://analisebet-backend.onrender.com";
+const WEBHOOK_URL = `https://analisebet-backend.onrender.com/bot${token}`;
 
-const bot = new TelegramBot(TELEGRAM_TOKEN);
-
-async function iniciarWebhook() {
+async function iniciarBot() {
   try {
-    await bot.deleteWebHook({
-      drop_pending_updates: true,
-    });
+    await bot.deleteWebHook();
 
     console.log("WEBHOOK ANTIGO REMOVIDO");
 
-    await bot.setWebHook(
-      `${URL_RENDER}/bot${TELEGRAM_TOKEN}`
-    );
+    await bot.setWebHook(WEBHOOK_URL);
 
     console.log("WEBHOOK ATIVADO");
-  } catch (erro) {
+  } catch (error) {
     console.log("ERRO WEBHOOK:");
-    console.log(erro.message);
+    console.log(error.message);
   }
 }
 
-app.post(`/bot${TELEGRAM_TOKEN}`, async (req, res) => {
+app.post(`/bot${token}`, (req, res) => {
+  bot.processUpdate(req.body);
+  res.sendStatus(200);
+});
+
+bot.on("message", async (msg) => {
   try {
-    const msg = req.body.message;
-
-    if (!msg) {
-      return res.sendStatus(200);
-    }
-
     const chatId = msg.chat.id;
 
-    const texto = msg.text || "";
+    const texto = msg.text;
 
-    console.log("BUSCANDO NO CACHE:");
-    console.log(texto);
+    if (!texto) {
+      return;
+    }
 
-    await bot.sendMessage(
-      chatId,
-      `Você buscou: ${texto}`
-    );
+    const jogos = buscarJogosPorTexto(texto);
 
-    res.sendStatus(200);
-  } catch (erro) {
-    console.log("ERRO GERAL:");
-    console.log(erro.message);
+    const mensagem = formatarMensagemJogos(jogos);
 
-    res.sendStatus(200);
+    await bot.sendMessage(chatId, mensagem);
+  } catch (error) {
+    console.log("ERRO TELEGRAM:");
+    console.log(error.message);
   }
 });
 
-app.get("/", (req, res) => {
-  res.send("AnaliseBet Backend Online");
-});
+async function atualizarCache() {
+  try {
+    console.log("=======================");
+    console.log("ATUALIZANDO CACHE...");
+    console.log("=======================");
+
+    const jogos = await atualizarCacheJogos();
+
+    console.log("===============================");
+    console.log("TOTAL FINAL:", jogos.length);
+    console.log("===============================");
+
+    salvarJogos(jogos);
+  } catch (error) {
+    console.log("ERRO CACHE:");
+    console.log(error.message);
+  }
+}
 
 app.listen(PORT, async () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 
-  await iniciarWebhook();
+  await iniciarBot();
+
+  await atualizarCache();
+
+  setInterval(async () => {
+    await atualizarCache();
+  }, 1000 * 60 * 10);
 });
