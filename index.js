@@ -2,11 +2,16 @@ import express from "express";
 import TelegramBot from "node-telegram-bot-api";
 
 import {
-  atualizarCacheJogos,
-  buscarJogosPorTexto
+  atualizarCacheJogos
 } from "./services/oddsService.js";
 
-import { analisarJogo } from "./services/analysisService.js";
+import {
+  buscarJogosPorTexto
+} from "./services/cacheService.js";
+
+import {
+  analisarJogo
+} from "./services/analysisService.js";
 
 const app = express();
 
@@ -18,228 +23,171 @@ const bot = new TelegramBot(TOKEN);
 
 const PORT = process.env.PORT || 10000;
 
-app.get("/", (req, res) => {
-  res.send("AnaliseBet IA Online");
-});
+const WEBHOOK_URL = "https://analisebet-backend.onrender.com";
 
 app.post(`/bot${TOKEN}`, (req, res) => {
   bot.processUpdate(req.body);
   res.sendStatus(200);
 });
 
-async function iniciarWebhook() {
-  const url = process.env.RENDER_EXTERNAL_URL;
+function formatarData(dataISO) {
+  const data = new Date(dataISO);
 
-  if (!url) {
-    console.log("RENDER_EXTERNAL_URL não encontrada");
-    return;
+  return data.toLocaleString("pt-BR", {
+    timeZone: "America/Bahia"
+  });
+}
+
+function limitarMensagem(texto, limite = 3500) {
+  if (texto.length <= limite) {
+    return [texto];
   }
 
-  try {
-    await bot.deleteWebHook();
+  const partes = [];
+  let atual = "";
 
-    console.log("WEBHOOK ANTIGO REMOVIDO");
+  const blocos = texto.split("━━━━━━━━━━━━━━━");
 
-    await bot.setWebHook(
-      `${url}/bot${TOKEN}`
-    );
+  for (const bloco of blocos) {
+    if ((atual + bloco).length > limite) {
+      partes.push(atual);
+      atual = "";
+    }
 
-    console.log("WEBHOOK ATIVADO");
+    atual += bloco + "\n━━━━━━━━━━━━━━━\n";
   }
 
-  catch (erro) {
-    console.log(
-      "ERRO NO WEBHOOK:"
-    );
-
-    console.log(erro.message);
+  if (atual.length > 0) {
+    partes.push(atual);
   }
+
+  return partes;
 }
 
 bot.on("message", async (msg) => {
   try {
     const chatId = msg.chat.id;
-
-    const texto =
-      msg.text?.trim();
+    const texto = msg.text;
 
     if (!texto) {
       return;
     }
 
-    const textoLower =
-      texto.toLowerCase();
+    const textoLower = texto.toLowerCase().trim();
 
     if (
       textoLower === "oi" ||
       textoLower === "olá" ||
-      textoLower === "ola"
+      textoLower === "ola" ||
+      textoLower === "opa" ||
+      textoLower === "bom dia" ||
+      textoLower === "boa tarde" ||
+      textoLower === "boa noite"
     ) {
       await bot.sendMessage(
         chatId,
-        `👋 Olá!\n\nEnvie:\n• Nome de time\n• Campeonato\n• País\n\nExemplos:\nBahia\nBrasileirão\nLa Liga\nChampions`
+        "👋 Fala! Me envie:\n\n• Nome de time\n• Campeonato\n• País\n\nExemplos:\nBahia\nFlamengo\nBrasileirão\nChampions\nLa Liga"
       );
 
       return;
     }
 
-    const jogos =
-      buscarJogosPorTexto(texto);
+    console.log("BUSCANDO NO CACHE:");
+    console.log(texto);
+
+    const jogos = buscarJogosPorTexto(texto);
 
     if (!jogos.length) {
       await bot.sendMessage(
         chatId,
-        `❌ Nenhum jogo encontrado para:\n${texto}`
+        `❌ Nenhum jogo encontrado para: ${texto}`
       );
 
       return;
     }
 
-    let resposta =
-      `🔎 Busca: ${texto}\n`;
+    let resposta = "";
 
-    resposta +=
-      `📊 Jogos encontrados: ${jogos.length}\n\n`;
+    resposta += `🔎 Busca: ${texto}\n`;
+    resposta += `📊 Jogos encontrados: ${jogos.length}\n\n`;
 
-    const jogosLimitados =
-      jogos.slice(0, 10);
+    const limiteJogos = jogos.slice(0, 10);
 
-    for (const jogo of jogosLimitados) {
+    for (const jogo of limiteJogos) {
+      const analise = analisarJogo(jogo);
 
-      const analise =
-        analisarJogo(jogo);
+      resposta += `🏆 ${jogo.liga}\n\n`;
 
-      if (!analise) {
-        continue;
-      }
+      resposta += `⚽ ${jogo.timeCasa} x ${jogo.timeFora}\n`;
 
-      const casa =
-        analise.casa;
+      resposta += `🕒 ${formatarData(jogo.data)}\n\n`;
 
-      const empate =
-        analise.empate;
+      resposta += `🏠 ${jogo.timeCasa}: ${jogo.odds.casa}\n`;
+      resposta += `📊 Chance estimada: ${analise.casa.chance}%\n`;
+      resposta += `🎯 Odd justa: ${analise.casa.oddJusta}\n`;
+      resposta += `💰 Valor esperado: ${analise.casa.valorEsperado}%\n`;
+      resposta += `${analise.casa.status}\n\n`;
 
-      const fora =
-        analise.fora;
+      resposta += `🤝 Empate: ${jogo.odds.empate}\n`;
+      resposta += `📊 Chance estimada: ${analise.empate.chance}%\n`;
+      resposta += `🎯 Odd justa: ${analise.empate.oddJusta}\n`;
+      resposta += `💰 Valor esperado: ${analise.empate.valorEsperado}%\n`;
+      resposta += `${analise.empate.status}\n\n`;
 
-      const data =
-        new Date(
-          jogo.commence_time
-        ).toLocaleString(
-          "pt-BR",
-          {
-            timeZone:
-              "America/Bahia"
-          }
-        );
+      resposta += `✈️ ${jogo.timeFora}: ${jogo.odds.fora}\n`;
+      resposta += `📊 Chance estimada: ${analise.fora.chance}%\n`;
+      resposta += `🎯 Odd justa: ${analise.fora.oddJusta}\n`;
+      resposta += `💰 Valor esperado: ${analise.fora.valorEsperado}%\n`;
+      resposta += `${analise.fora.status}\n\n`;
 
-      const liga =
-        jogo.sport_title
-          ?.replace(
-            "Brazil",
-            "Brasil"
-          );
-
-      resposta +=
-`🏆 ${liga}
-
-⚽ ${jogo.home_team} x ${jogo.away_team}
-🕒 ${data}
-
-🏠 ${jogo.home_team}: ${casa.odd}
-📊 Chance estimada: ${casa.probabilidade}%
-🎯 Odd justa: ${casa.oddJusta}
-💰 Valor esperado: ${casa.ev}%
-${textoEV(casa.ev)}
-
-🤝 Empate: ${empate.odd}
-📊 Chance estimada: ${empate.probabilidade}%
-🎯 Odd justa: ${empate.oddJusta}
-💰 Valor esperado: ${empate.ev}%
-${textoEV(empate.ev)}
-
-✈️ ${jogo.away_team}: ${fora.odd}
-📊 Chance estimada: ${fora.probabilidade}%
-🎯 Odd justa: ${fora.oddJusta}
-💰 Valor esperado: ${fora.ev}%
-${textoEV(fora.ev)}
-
-━━━━━━━━━━━━━━━
-
-`;
+      resposta += `━━━━━━━━━━━━━━━\n\n`;
     }
 
     if (jogos.length > 10) {
-      resposta +=
-        `⚠️ Mostrando apenas os 10 primeiros resultados.`;
+      resposta += `⚠️ Mostrando apenas os 10 primeiros resultados.`;
     }
 
-    await bot.sendMessage(
-      chatId,
-      resposta
-    );
-  }
+    const mensagens = limitarMensagem(resposta);
 
-  catch (erro) {
-    console.log(
-      "ERRO NO BOT:"
-    );
-
+    for (const mensagem of mensagens) {
+      await bot.sendMessage(chatId, mensagem);
+    }
+  } catch (erro) {
+    console.log("ERRO NO BOT:");
     console.log(erro);
 
     await bot.sendMessage(
       msg.chat.id,
-      "❌ Erro interno no sistema."
+      "❌ Ocorreu um erro ao analisar os jogos."
     );
   }
 });
 
-function textoEV(ev) {
-  const valor =
-    Number(ev);
-
-  if (valor >= 15) {
-    return "🔥 Excelente valor";
-  }
-
-  if (valor >= 5) {
-    return "✅ Boa oportunidade";
-  }
-
-  return "❌ Sem valor";
-}
-
 async function iniciarSistema() {
   try {
+    console.log("=======================");
+    console.log("ATUALIZANDO CACHE...");
+    console.log("=======================");
+
     await atualizarCacheJogos();
 
-    setInterval(
-      atualizarCacheJogos,
-      1000 * 60 * 10
-    );
+    await bot.deleteWebHook();
 
-    await iniciarWebhook();
+    console.log("WEBHOOK ANTIGO REMOVIDO");
 
-    console.log(
-      "Sistema iniciado"
-    );
-  }
+    await bot.setWebHook(`${WEBHOOK_URL}/bot${TOKEN}`);
 
-  catch (erro) {
-    console.log(
-      "ERRO INICIANDO SISTEMA:"
-    );
+    console.log("WEBHOOK ATIVADO");
 
-    console.log(
-      erro.message
-    );
+    console.log("Sistema iniciado");
+  } catch (erro) {
+    console.log("ERRO INICIANDO SISTEMA:");
+    console.log(erro.message);
   }
 }
 
 app.listen(PORT, async () => {
-  console.log(
-    `Servidor rodando na porta ${PORT}`
-  );
+  console.log(`Servidor rodando na porta ${PORT}`);
 
   await iniciarSistema();
 });
