@@ -10,6 +10,10 @@ import {
   atualizarCacheJogos
 } from "./services/oddsService.js";
 
+import {
+  analisarMercado
+} from "./services/valueService.js";
+
 const app = express();
 
 app.use(express.json());
@@ -118,22 +122,37 @@ bot.on("message", async (msg) => {
         }
       );
 
+      const analise = analisarMercado(
+        casa,
+        empate,
+        fora
+      );
+
       resposta += `🏆 <b>${jogo.league}</b>\n\n`;
 
       resposta += `⚽ ${jogo.home_team} x ${jogo.away_team}\n`;
 
       resposta += `🕒 ${horario}\n\n`;
 
-      if (casa) {
+      if (casa && analise) {
         resposta += `🏠 Casa: ${casa.price}\n`;
+        resposta += `📊 Prob: ${(analise.casa.prob * 100).toFixed(1)}%\n`;
+        resposta += `🎯 Odd justa: ${analise.casa.oddJusta.toFixed(2)}\n`;
+        resposta += `🔥 EV: ${analise.casa.ev.toFixed(1)}%\n\n`;
       }
 
-      if (empate) {
+      if (empate && analise) {
         resposta += `🤝 Empate: ${empate.price}\n`;
+        resposta += `📊 Prob: ${(analise.empate.prob * 100).toFixed(1)}%\n`;
+        resposta += `🎯 Odd justa: ${analise.empate.oddJusta.toFixed(2)}\n`;
+        resposta += `🔥 EV: ${analise.empate.ev.toFixed(1)}%\n\n`;
       }
 
-      if (fora) {
+      if (fora && analise) {
         resposta += `✈️ Fora: ${fora.price}\n`;
+        resposta += `📊 Prob: ${(analise.fora.prob * 100).toFixed(1)}%\n`;
+        resposta += `🎯 Odd justa: ${analise.fora.oddJusta.toFixed(2)}\n`;
+        resposta += `🔥 EV: ${analise.fora.ev.toFixed(1)}%\n`;
       }
 
       resposta += `\n━━━━━━━━━━━━━━━\n\n`;
