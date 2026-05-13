@@ -35,7 +35,7 @@ export async function atualizarCacheJogos() {
         const response = await axios.get(url, {
           params: {
             apiKey: ODDS_API_KEY,
-            regions: "us,eu,br",
+            regions: "us,eu",
             markets: "h2h",
             oddsFormat: "decimal"
           }
