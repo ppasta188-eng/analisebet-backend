@@ -60,6 +60,31 @@ app.post(`/bot${TELEGRAM_TOKEN}`, (req, res) => {
   res.sendStatus(200);
 });
 
+function traduzirLiga(nomeLiga) {
+  return nomeLiga
+    .replace("Brazil", "Brasil")
+    .replace("Spain", "Espanha")
+    .replace("Germany", "Alemanha")
+    .replace("Italy", "Itália")
+    .replace("France", "França");
+}
+
+function gerarMensagemValor(nomeTime, valorEsperado) {
+  if (valorEsperado >= 8) {
+    return `🔥 Forte valor encontrado para ${nomeTime}`;
+  }
+
+  if (valorEsperado >= 4) {
+    return `✅ Boa oportunidade para ${nomeTime}`;
+  }
+
+  if (valorEsperado >= 0) {
+    return `⚖️ Mercado equilibrado para ${nomeTime}`;
+  }
+
+  return `❌ Sem valor para ${nomeTime}`;
+}
+
 bot.on("message", async (msg) => {
   try {
     const chatId = msg.chat.id;
@@ -125,34 +150,43 @@ bot.on("message", async (msg) => {
       const analise = analisarMercado(
         casa,
         empate,
-        fora
+        fora,
+        jogo
       );
 
-      resposta += `🏆 <b>${jogo.league}</b>\n\n`;
+      resposta += `🏆 <b>${traduzirLiga(jogo.league)}</b>\n\n`;
 
       resposta += `⚽ ${jogo.home_team} x ${jogo.away_team}\n`;
 
       resposta += `🕒 ${horario}\n\n`;
 
       if (casa && analise) {
-        resposta += `🏠 Casa: ${casa.price}\n`;
-        resposta += `📊 Prob: ${(analise.casa.prob * 100).toFixed(1)}%\n`;
+        resposta += `🏠 ${jogo.home_team}: ${casa.price}\n`;
+        resposta += `📊 Chance estimada: ${(analise.casa.prob * 100).toFixed(1)}%\n`;
         resposta += `🎯 Odd justa: ${analise.casa.oddJusta.toFixed(2)}\n`;
-        resposta += `🔥 EV: ${analise.casa.ev.toFixed(1)}%\n\n`;
+        resposta += `💰 Valor esperado: ${analise.casa.valorEsperado.toFixed(1)}%\n`;
+        resposta += `${gerarMensagemValor(
+          jogo.home_team,
+          analise.casa.valorEsperado
+        )}\n\n`;
       }
 
       if (empate && analise) {
         resposta += `🤝 Empate: ${empate.price}\n`;
-        resposta += `📊 Prob: ${(analise.empate.prob * 100).toFixed(1)}%\n`;
+        resposta += `📊 Chance estimada: ${(analise.empate.prob * 100).toFixed(1)}%\n`;
         resposta += `🎯 Odd justa: ${analise.empate.oddJusta.toFixed(2)}\n`;
-        resposta += `🔥 EV: ${analise.empate.ev.toFixed(1)}%\n\n`;
+        resposta += `💰 Valor esperado: ${analise.empate.valorEsperado.toFixed(1)}%\n\n`;
       }
 
       if (fora && analise) {
-        resposta += `✈️ Fora: ${fora.price}\n`;
-        resposta += `📊 Prob: ${(analise.fora.prob * 100).toFixed(1)}%\n`;
+        resposta += `✈️ ${jogo.away_team}: ${fora.price}\n`;
+        resposta += `📊 Chance estimada: ${(analise.fora.prob * 100).toFixed(1)}%\n`;
         resposta += `🎯 Odd justa: ${analise.fora.oddJusta.toFixed(2)}\n`;
-        resposta += `🔥 EV: ${analise.fora.ev.toFixed(1)}%\n`;
+        resposta += `💰 Valor esperado: ${analise.fora.valorEsperado.toFixed(1)}%\n`;
+        resposta += `${gerarMensagemValor(
+          jogo.away_team,
+          analise.fora.valorEsperado
+        )}\n`;
       }
 
       resposta += `\n━━━━━━━━━━━━━━━\n\n`;
