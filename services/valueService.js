@@ -1,57 +1,123 @@
-export function calcularProbabilidades(odds) {
-  const probabilidades = odds.map((odd) => 1 / odd);
-
+function normalizarProbabilidades(probabilidades) {
   const soma = probabilidades.reduce((a, b) => a + b, 0);
 
   return probabilidades.map((p) => p / soma);
 }
 
-export function calcularOddJusta(probabilidade) {
+function calcularOddJusta(probabilidade) {
   return 1 / probabilidade;
 }
 
-export function calcularEV(oddMercado, oddJusta) {
+function calcularValorEsperado(oddMercado, oddJusta) {
   return ((oddMercado / oddJusta) - 1) * 100;
 }
 
-export function analisarMercado(casa, empate, fora) {
+function ajustarProbabilidades(
+  probCasa,
+  probEmpate,
+  probFora,
+  jogo
+) {
+  let casa = probCasa;
+  let empate = probEmpate;
+  let fora = probFora;
+
+  const timeCasa = jogo.home_team.toLowerCase();
+  const timeFora = jogo.away_team.toLowerCase();
+
+  const timesFortes = [
+    "flamengo",
+    "palmeiras",
+    "atletico mineiro",
+    "atlético mineiro",
+    "botafogo",
+    "fluminense"
+  ];
+
+  if (timesFortes.includes(timeCasa)) {
+    casa += 0.04;
+    empate -= 0.02;
+    fora -= 0.02;
+  }
+
+  if (timesFortes.includes(timeFora)) {
+    fora += 0.04;
+    empate -= 0.02;
+    casa -= 0.02;
+  }
+
+  return normalizarProbabilidades([
+    casa,
+    empate,
+    fora
+  ]);
+}
+
+export function analisarMercado(
+  casa,
+  empate,
+  fora,
+  jogo
+) {
   if (!casa || !empate || !fora) {
     return null;
   }
 
-  const odds = [
-    casa.price,
-    empate.price,
-    fora.price
+  const probsOriginais = [
+    1 / casa.price,
+    1 / empate.price,
+    1 / fora.price
   ];
 
-  const probs = calcularProbabilidades(odds);
+  const probsSemMargem = normalizarProbabilidades(
+    probsOriginais
+  );
 
-  const oddJustaCasa = calcularOddJusta(probs[0]);
-  const oddJustaEmpate = calcularOddJusta(probs[1]);
-  const oddJustaFora = calcularOddJusta(probs[2]);
+  const probsAjustadas = ajustarProbabilidades(
+    probsSemMargem[0],
+    probsSemMargem[1],
+    probsSemMargem[2],
+    jogo
+  );
 
-  const evCasa = calcularEV(casa.price, oddJustaCasa);
-  const evEmpate = calcularEV(empate.price, oddJustaEmpate);
-  const evFora = calcularEV(fora.price, oddJustaFora);
+  const oddJustaCasa = calcularOddJusta(
+    probsAjustadas[0]
+  );
+
+  const oddJustaEmpate = calcularOddJusta(
+    probsAjustadas[1]
+  );
+
+  const oddJustaFora = calcularOddJusta(
+    probsAjustadas[2]
+  );
 
   return {
     casa: {
-      prob: probs[0],
+      prob: probsAjustadas[0],
       oddJusta: oddJustaCasa,
-      ev: evCasa
+      valorEsperado: calcularValorEsperado(
+        casa.price,
+        oddJustaCasa
+      )
     },
 
     empate: {
-      prob: probs[1],
+      prob: probsAjustadas[1],
       oddJusta: oddJustaEmpate,
-      ev: evEmpate
+      valorEsperado: calcularValorEsperado(
+        empate.price,
+        oddJustaEmpate
+      )
     },
 
     fora: {
-      prob: probs[2],
+      prob: probsAjustadas[2],
       oddJusta: oddJustaFora,
-      ev: evFora
+      valorEsperado: calcularValorEsperado(
+        fora.price,
+        oddJustaFora
+      )
     }
   };
 }
