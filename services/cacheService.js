@@ -26,6 +26,7 @@ function normalizarTexto(texto = "") {
 
 function formatarJogo(jogo) {
   const bookmaker = jogo.bookmakers?.[0];
+
   const market = bookmaker?.markets?.find(
     (m) => m.key === "h2h"
   );
@@ -33,23 +34,32 @@ function formatarJogo(jogo) {
   const outcomes = market?.outcomes || [];
 
   const oddCasa =
-    outcomes.find((o) => o.name === jogo.home_team)?.price || null;
+    outcomes.find(
+      (o) => o.name === jogo.home_team
+    )?.price || null;
 
   const oddFora =
-    outcomes.find((o) => o.name === jogo.away_team)?.price || null;
+    outcomes.find(
+      (o) => o.name === jogo.away_team
+    )?.price || null;
 
   const oddEmpate =
-    outcomes.find((o) => o.name === "Draw")?.price ||
-    outcomes.find((o) => o.name === "Empate")?.price ||
-    null;
+    outcomes.find(
+      (o) =>
+        o.name === "Draw" ||
+        o.name === "Empate"
+    )?.price || null;
 
   return {
     id: jogo.id,
 
     esporte: jogo.sport_key,
-    campeonato: jogo.sport_title,
+
+    campeonato: jogo.sport_title
+      ?.replace("Brazil", "Brasil"),
 
     casa: jogo.home_team,
+
     fora: jogo.away_team,
 
     data: jogo.commence_time,
@@ -68,7 +78,7 @@ export async function atualizarCache() {
     console.log("ATUALIZANDO CACHE...");
     console.log("=======================");
 
-    let jogosFormatados = [];
+    let jogos = [];
 
     for (const esporte of esportes) {
       try {
@@ -80,25 +90,31 @@ export async function atualizarCache() {
           {
             params: {
               apiKey: API_KEY,
-              regions: "us,eu,uk",
+              regions: "us,uk,eu",
               markets: "h2h",
               oddsFormat: "decimal"
             }
           }
         );
 
-        console.log(`ENCONTRADOS: ${response.data.length}`);
+        console.log(
+          `ENCONTRADOS: ${response.data.length}`
+        );
 
-        const jogos = response.data.map(formatarJogo);
+        const jogosFormatados =
+          response.data.map(formatarJogo);
 
-        jogosFormatados.push(...jogos);
+        jogos.push(...jogosFormatados);
       } catch (erroEsporte) {
-        console.log(`ERRO AO CONSULTAR ${esporte}`);
+        console.log(
+          `ERRO AO CONSULTAR ${esporte}`
+        );
+
         console.log(erroEsporte.message);
       }
     }
 
-    cacheJogos = jogosFormatados;
+    cacheJogos = jogos;
 
     console.log("===============================");
     console.log(`TOTAL FINAL: ${cacheJogos.length}`);
@@ -109,12 +125,12 @@ export async function atualizarCache() {
     console.log(cacheJogos.length);
     console.log("=======================");
   } catch (erro) {
-    console.log("ERRO AO ATUALIZAR CACHE:");
+    console.log("ERRO NO CACHE:");
     console.log(erro.message);
   }
 }
 
-export function buscarJogos(textoBusca) {
+export function buscarJogosPorTexto(textoBusca) {
   console.log("BUSCANDO NO CACHE:");
   console.log(textoBusca);
 
