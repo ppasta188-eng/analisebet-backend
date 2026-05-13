@@ -1,4 +1,4 @@
-export function calcularAnaliseMercado(jogo) {
+export function analisarJogo(jogo) {
   const bookmaker = jogo.bookmakers?.[0];
 
   if (!bookmaker) {
