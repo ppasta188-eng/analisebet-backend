@@ -3,7 +3,7 @@ import TelegramBot from "node-telegram-bot-api";
 
 import {
   atualizarCacheJogos,
-} from "./services/apiService.js";
+} from "./services/oddsService.js";
 
 import {
   salvarJogos,
