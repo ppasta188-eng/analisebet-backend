@@ -1,4 +1,4 @@
-export function calcularProbabilidades(
+export function gerarProbabilidades(
   oddCasa,
   oddEmpate,
   oddFora,
