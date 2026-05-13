@@ -1,175 +1,45 @@
-const FORCA_TIMES = {
-  flamengo: 92,
-  palmeiras: 91,
-  bahia: 78,
-  gremio: 79,
-  corinthians: 82,
-  sao_paulo: 84,
-  fluminense: 84,
-  botafogo: 85,
-  internacional: 83,
-  atletico_mineiro: 84,
-  santos: 76,
-  vasco_da_gama: 75,
-  coritiba: 72,
-  vitoria: 70,
-  mirassol: 68,
-  remo: 66,
-  chapecoense: 67
-};
+export function calcularAnaliseMercado(jogo) {
+  const bookmaker = jogo.bookmakers?.[0];
 
-function normalizar(nome) {
-  return nome
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, "_");
-}
+  if (!bookmaker) {
+    return null;
+  }
 
-function obterForca(nome) {
-  return FORCA_TIMES[
-    normalizar(nome)
-  ] || 70;
-}
+  const market = bookmaker.markets?.find(
+    (m) => m.key === "h2h"
+  );
 
-function obterOddsCorretas(jogo) {
-  const outcomes =
-    jogo.bookmakers?.[0]?.markets?.[0]?.outcomes || [];
+  if (!market) {
+    return null;
+  }
 
   let oddCasa = null;
   let oddEmpate = null;
   let oddFora = null;
 
-  for (const outcome of outcomes) {
-    const nome =
-      outcome.name?.toLowerCase();
+  for (const outcome of market.outcomes) {
+    const nome = outcome.name.toLowerCase();
 
     if (
-      nome ===
-      jogo.home_team.toLowerCase()
+      nome === jogo.home_team.toLowerCase()
     ) {
       oddCasa = outcome.price;
     }
 
     else if (
-      nome ===
-      jogo.away_team.toLowerCase()
+      nome === jogo.away_team.toLowerCase()
     ) {
       oddFora = outcome.price;
     }
 
     else if (
-      nome.includes("draw")
+      nome.includes("draw") ||
+      nome.includes("tie") ||
+      nome.includes("empate")
     ) {
       oddEmpate = outcome.price;
     }
   }
-
-  return {
-    oddCasa,
-    oddEmpate,
-    oddFora
-  };
-}
-
-function calcularProbabilidades(
-  oddCasa,
-  oddEmpate,
-  oddFora
-) {
-  const casa = 1 / oddCasa;
-  const empate = 1 / oddEmpate;
-  const fora = 1 / oddFora;
-
-  const soma =
-    casa + empate + fora;
-
-  return {
-    casa: casa / soma,
-    empate: empate / soma,
-    fora: fora / soma
-  };
-}
-
-function aplicarModelo(
-  probabilidades,
-  timeCasa,
-  timeFora
-) {
-  const forcaCasa =
-    obterForca(timeCasa);
-
-  const forcaFora =
-    obterForca(timeFora);
-
-  let casa =
-    probabilidades.casa;
-
-  let empate =
-    probabilidades.empate;
-
-  let fora =
-    probabilidades.fora;
-
-  // mando
-  casa += 0.04;
-
-  // força
-  const diff =
-    (forcaCasa - forcaFora) / 100;
-
-  casa += diff * 0.12;
-
-  fora -= diff * 0.12;
-
-  empate -=
-    Math.abs(diff) * 0.03;
-
-  const soma =
-    casa + empate + fora;
-
-  return {
-    casa: casa / soma,
-    empate: empate / soma,
-    fora: fora / soma
-  };
-}
-
-function oddJusta(prob) {
-  return 1 / prob;
-}
-
-function valorEsperado(
-  odd,
-  prob
-) {
-  return (
-    (odd * prob) - 1
-  ) * 100;
-}
-
-function classificar(ev) {
-  if (ev >= 15) {
-    return "🔥 Excelente valor";
-  }
-
-  if (ev >= 8) {
-    return "✅ Boa oportunidade";
-  }
-
-  if (ev >= 3) {
-    return "⚠️ Valor baixo";
-  }
-
-  return "❌ Sem valor";
-}
-
-export function analisarJogo(jogo) {
-  const {
-    oddCasa,
-    oddEmpate,
-    oddFora
-  } = obterOddsCorretas(jogo);
 
   if (
     !oddCasa ||
@@ -179,63 +49,68 @@ export function analisarJogo(jogo) {
     return null;
   }
 
-  const probsBase =
-    calcularProbabilidades(
-      oddCasa,
-      oddEmpate,
-      oddFora
-    );
+  const somaProbabilidades =
+    (1 / oddCasa) +
+    (1 / oddEmpate) +
+    (1 / oddFora);
 
-  const probs =
-    aplicarModelo(
-      probsBase,
-      jogo.home_team,
-      jogo.away_team
-    );
+  const probCasa =
+    (1 / oddCasa) / somaProbabilidades;
+
+  const probEmpate =
+    (1 / oddEmpate) / somaProbabilidades;
+
+  const probFora =
+    (1 / oddFora) / somaProbabilidades;
+
+  const oddJustaCasa =
+    1 / probCasa;
+
+  const oddJustaEmpate =
+    1 / probEmpate;
+
+  const oddJustaFora =
+    1 / probFora;
 
   const evCasa =
-    valorEsperado(
-      oddCasa,
-      probs.casa
-    );
+    ((oddCasa * probCasa) - 1) * 100;
 
   const evEmpate =
-    valorEsperado(
-      oddEmpate,
-      probs.empate
-    );
+    ((oddEmpate * probEmpate) - 1) * 100;
 
   const evFora =
-    valorEsperado(
-      oddFora,
-      probs.fora
-    );
+    ((oddFora * probFora) - 1) * 100;
 
   return {
-    odds: {
-      casa: oddCasa,
-      empate: oddEmpate,
-      fora: oddFora
-    },
+    oddCasa,
+    oddEmpate,
+    oddFora,
 
-    probabilidades: probs,
+    probCasa:
+      (probCasa * 100).toFixed(1),
 
-    oddsJustas: {
-      casa: oddJusta(probs.casa),
-      empate: oddJusta(probs.empate),
-      fora: oddJusta(probs.fora)
-    },
+    probEmpate:
+      (probEmpate * 100).toFixed(1),
 
-    valorEsperado: {
-      casa: evCasa,
-      empate: evEmpate,
-      fora: evFora
-    },
+    probFora:
+      (probFora * 100).toFixed(1),
 
-    classificacao: {
-      casa: classificar(evCasa),
-      empate: classificar(evEmpate),
-      fora: classificar(evFora)
-    }
+    oddJustaCasa:
+      oddJustaCasa.toFixed(2),
+
+    oddJustaEmpate:
+      oddJustaEmpate.toFixed(2),
+
+    oddJustaFora:
+      oddJustaFora.toFixed(2),
+
+    evCasa:
+      evCasa.toFixed(1),
+
+    evEmpate:
+      evEmpate.toFixed(1),
+
+    evFora:
+      evFora.toFixed(1)
   };
 }
