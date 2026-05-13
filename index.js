@@ -2,105 +2,73 @@ import express from "express";
 import TelegramBot from "node-telegram-bot-api";
 
 import {
-  atualizarCacheJogos
-} from "./services/oddsService.js";
-
-import {
+  atualizarCache,
   buscarJogosPorTexto
 } from "./services/cacheService.js";
 
-import {
-  analisarJogo
-} from "./services/analysisService.js";
+import { analisarJogo } from "./services/analysisService.js";
 
 const app = express();
 
 app.use(express.json());
 
+const PORT = process.env.PORT || 10000;
+
 const TOKEN = process.env.TELEGRAM_TOKEN;
+
+const RENDER_URL = process.env.RENDER_EXTERNAL_URL;
 
 const bot = new TelegramBot(TOKEN);
 
-const PORT = process.env.PORT || 10000;
-
-const WEBHOOK_URL = "https://analisebet-backend.onrender.com";
-
-app.post(`/bot${TOKEN}`, (req, res) => {
-  bot.processUpdate(req.body);
-  res.sendStatus(200);
-});
-
-function formatarData(dataISO) {
-  const data = new Date(dataISO);
-
-  return data.toLocaleString("pt-BR", {
-    timeZone: "America/Bahia"
-  });
-}
-
-function limitarMensagem(texto, limite = 3500) {
-  if (texto.length <= limite) {
-    return [texto];
-  }
-
+function dividirMensagem(texto, limite = 3500) {
   const partes = [];
-  let atual = "";
 
-  const blocos = texto.split("━━━━━━━━━━━━━━━");
-
-  for (const bloco of blocos) {
-    if ((atual + bloco).length > limite) {
-      partes.push(atual);
-      atual = "";
-    }
-
-    atual += bloco + "\n━━━━━━━━━━━━━━━\n";
-  }
-
-  if (atual.length > 0) {
-    partes.push(atual);
+  for (let i = 0; i < texto.length; i += limite) {
+    partes.push(texto.slice(i, i + limite));
   }
 
   return partes;
 }
 
+async function enviarMensagemGrande(chatId, texto) {
+  const partes = dividirMensagem(texto);
+
+  for (const parte of partes) {
+    await bot.sendMessage(chatId, parte);
+  }
+}
+
+app.post(`/bot${TOKEN}`, async (req, res) => {
+  try {
+    bot.processUpdate(req.body);
+
+    res.sendStatus(200);
+  } catch (erro) {
+    console.log("ERRO WEBHOOK:");
+    console.log(erro);
+
+    res.sendStatus(500);
+  }
+});
+
 bot.on("message", async (msg) => {
   try {
     const chatId = msg.chat.id;
-    const texto = msg.text;
+
+    const texto = msg.text?.trim();
 
     if (!texto) {
       return;
     }
 
-    const textoLower = texto.toLowerCase().trim();
+    const busca = texto;
 
-    if (
-      textoLower === "oi" ||
-      textoLower === "olá" ||
-      textoLower === "ola" ||
-      textoLower === "opa" ||
-      textoLower === "bom dia" ||
-      textoLower === "boa tarde" ||
-      textoLower === "boa noite"
-    ) {
-      await bot.sendMessage(
-        chatId,
-        "👋 Fala! Me envie:\n\n• Nome de time\n• Campeonato\n• País\n\nExemplos:\nBahia\nFlamengo\nBrasileirão\nChampions\nLa Liga"
-      );
-
-      return;
-    }
-
-    console.log("BUSCANDO NO CACHE:");
-    console.log(texto);
-
-    const jogos = buscarJogosPorTexto(texto);
+    const jogos = buscarJogosPorTexto(busca);
 
     if (!jogos.length) {
       await bot.sendMessage(
         chatId,
-        `❌ Nenhum jogo encontrado para: ${texto}`
+        `❌ Nenhum jogo encontrado para: ${busca}`
       );
 
       return;
@@ -108,37 +76,41 @@ bot.on("message", async (msg) => {
 
     let resposta = "";
 
-    resposta += `🔎 Busca: ${texto}\n`;
+    resposta += `🔎 Busca: ${busca}\n`;
     resposta += `📊 Jogos encontrados: ${jogos.length}\n\n`;
 
-    const limiteJogos = jogos.slice(0, 10);
+    const jogosLimitados = jogos.slice(0, 10);
 
-    for (const jogo of limiteJogos) {
+    for (const jogo of jogosLimitados) {
       const analise = analisarJogo(jogo);
 
-      resposta += `🏆 ${jogo.liga}\n\n`;
+      const casa = analise?.casa || {};
+      const empate = analise?.empate || {};
+      const fora = analise?.fora || {};
 
-      resposta += `⚽ ${jogo.timeCasa} x ${jogo.timeFora}\n`;
+      resposta += `🏆 ${jogo.campeonato}\n\n`;
 
-      resposta += `🕒 ${formatarData(jogo.data)}\n\n`;
+      resposta += `⚽ ${jogo.casa} x ${jogo.fora}\n`;
 
-      resposta += `🏠 ${jogo.timeCasa}: ${jogo.odds.casa}\n`;
-      resposta += `📊 Chance estimada: ${analise.casa.chance}%\n`;
-      resposta += `🎯 Odd justa: ${analise.casa.oddJusta}\n`;
-      resposta += `💰 Valor esperado: ${analise.casa.valorEsperado}%\n`;
-      resposta += `${analise.casa.status}\n\n`;
+      resposta += `🕒 ${new Date(jogo.data).toLocaleString("pt-BR")}\n\n`;
 
-      resposta += `🤝 Empate: ${jogo.odds.empate}\n`;
-      resposta += `📊 Chance estimada: ${analise.empate.chance}%\n`;
-      resposta += `🎯 Odd justa: ${analise.empate.oddJusta}\n`;
-      resposta += `💰 Valor esperado: ${analise.empate.valorEsperado}%\n`;
-      resposta += `${analise.empate.status}\n\n`;
+      resposta += `🏠 ${jogo.casa}: ${jogo.odds?.casa ?? "-"}\n`;
+      resposta += `📊 Chance estimada: ${casa.probabilidade ?? "-"}%\n`;
+      resposta += `🎯 Odd justa: ${casa.oddJusta ?? "-"}\n`;
+      resposta += `💰 Valor esperado: ${casa.valorEsperado ?? "-"}%\n`;
+      resposta += `${casa.classificacao ?? "❌ Sem valor"}\n\n`;
 
-      resposta += `✈️ ${jogo.timeFora}: ${jogo.odds.fora}\n`;
-      resposta += `📊 Chance estimada: ${analise.fora.chance}%\n`;
-      resposta += `🎯 Odd justa: ${analise.fora.oddJusta}\n`;
-      resposta += `💰 Valor esperado: ${analise.fora.valorEsperado}%\n`;
-      resposta += `${analise.fora.status}\n\n`;
+      resposta += `🤝 Empate: ${jogo.odds?.empate ?? "-"}\n`;
+      resposta += `📊 Chance estimada: ${empate.probabilidade ?? "-"}%\n`;
+      resposta += `🎯 Odd justa: ${empate.oddJusta ?? "-"}\n`;
+      resposta += `💰 Valor esperado: ${empate.valorEsperado ?? "-"}%\n`;
+      resposta += `${empate.classificacao ?? "❌ Sem valor"}\n\n`;
+
+      resposta += `✈️ ${jogo.fora}: ${jogo.odds?.fora ?? "-"}\n`;
+      resposta += `📊 Chance estimada: ${fora.probabilidade ?? "-"}%\n`;
+      resposta += `🎯 Odd justa: ${fora.oddJusta ?? "-"}\n`;
+      resposta += `💰 Valor esperado: ${fora.valorEsperado ?? "-"}%\n`;
+      resposta += `${fora.classificacao ?? "❌ Sem valor"}\n\n`;
 
       resposta += `━━━━━━━━━━━━━━━\n\n`;
     }
@@ -147,19 +119,17 @@ bot.on("message", async (msg) => {
       resposta += `⚠️ Mostrando apenas os 10 primeiros resultados.`;
     }
 
-    const mensagens = limitarMensagem(resposta);
-
-    for (const mensagem of mensagens) {
-      await bot.sendMessage(chatId, mensagem);
-    }
+    await enviarMensagemGrande(chatId, resposta);
   } catch (erro) {
     console.log("ERRO NO BOT:");
     console.log(erro);
 
-    await bot.sendMessage(
-      msg.chat.id,
-      "❌ Ocorreu um erro ao analisar os jogos."
-    );
+    try {
+      await bot.sendMessage(
+        msg.chat.id,
+        "❌ Erro interno no sistema."
+      );
+    } catch {}
   }
 });
 
@@ -169,25 +139,31 @@ async function iniciarSistema() {
     console.log("ATUALIZANDO CACHE...");
     console.log("=======================");
 
-    await atualizarCacheJogos();
+    await atualizarCache();
+
+    setInterval(
+      atualizarCache,
+      1000 * 60 * 10
+    );
+
+    const webhookUrl = `${RENDER_URL}/bot${TOKEN}`;
 
     await bot.deleteWebHook();
 
     console.log("WEBHOOK ANTIGO REMOVIDO");
 
-    await bot.setWebHook(`${WEBHOOK_URL}/bot${TOKEN}`);
+    await bot.setWebHook(webhookUrl);
 
     console.log("WEBHOOK ATIVADO");
 
-    console.log("Sistema iniciado");
+    app.listen(PORT, () => {
+      console.log(`Servidor rodando na porta ${PORT}`);
+      console.log("Sistema iniciado");
+    });
   } catch (erro) {
-    console.log("ERRO INICIANDO SISTEMA:");
-    console.log(erro.message);
+    console.log("ERRO AO INICIAR:");
+    console.log(erro);
   }
 }
 
-app.listen(PORT, async () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
-
-  await iniciarSistema();
-});
+iniciarSistema();
