@@ -82,35 +82,34 @@ export function analisarJogo(jogo) {
     ((oddFora * probFora) - 1) * 100;
 
   return {
-    oddCasa,
-    oddEmpate,
-    oddFora,
+    casa: {
+      odd: oddCasa,
+      probabilidade:
+        (probCasa * 100).toFixed(1),
+      oddJusta:
+        oddJustaCasa.toFixed(2),
+      ev:
+        evCasa.toFixed(1)
+    },
 
-    probCasa:
-      (probCasa * 100).toFixed(1),
+    empate: {
+      odd: oddEmpate,
+      probabilidade:
+        (probEmpate * 100).toFixed(1),
+      oddJusta:
+        oddJustaEmpate.toFixed(2),
+      ev:
+        evEmpate.toFixed(1)
+    },
 
-    probEmpate:
-      (probEmpate * 100).toFixed(1),
-
-    probFora:
-      (probFora * 100).toFixed(1),
-
-    oddJustaCasa:
-      oddJustaCasa.toFixed(2),
-
-    oddJustaEmpate:
-      oddJustaEmpate.toFixed(2),
-
-    oddJustaFora:
-      oddJustaFora.toFixed(2),
-
-    evCasa:
-      evCasa.toFixed(1),
-
-    evEmpate:
-      evEmpate.toFixed(1),
-
-    evFora:
-      evFora.toFixed(1)
+    fora: {
+      odd: oddFora,
+      probabilidade:
+        (probFora * 100).toFixed(1),
+      oddJusta:
+        oddJustaFora.toFixed(2),
+      ev:
+        evFora.toFixed(1)
+    }
   };
 }
