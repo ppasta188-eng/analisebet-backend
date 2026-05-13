@@ -12,143 +12,157 @@ const app = express();
 
 app.use(express.json());
 
+const TOKEN = process.env.TELEGRAM_TOKEN;
+
+const bot = new TelegramBot(TOKEN);
+
 const PORT = process.env.PORT || 10000;
 
-const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
+app.get("/", (req, res) => {
+  res.send("AnaliseBet IA Online");
+});
 
-const bot = new TelegramBot(TELEGRAM_TOKEN);
+app.post(`/bot${TOKEN}`, (req, res) => {
+  bot.processUpdate(req.body);
+  res.sendStatus(200);
+});
 
-const WEBHOOK_URL = `https://analisebet-backend.onrender.com/bot${TELEGRAM_TOKEN}`;
+async function iniciarWebhook() {
+  const url = process.env.RENDER_EXTERNAL_URL;
 
-async function iniciarSistema() {
+  if (!url) {
+    console.log("RENDER_EXTERNAL_URL não encontrada");
+    return;
+  }
+
   try {
     await bot.deleteWebHook();
 
     console.log("WEBHOOK ANTIGO REMOVIDO");
 
-    await bot.setWebHook(WEBHOOK_URL);
+    await bot.setWebHook(
+      `${url}/bot${TOKEN}`
+    );
 
     console.log("WEBHOOK ATIVADO");
+  }
 
-    await atualizarCacheJogos();
-  } catch (erro) {
-    console.log("ERRO INICIANDO SISTEMA:");
+  catch (erro) {
+    console.log(
+      "ERRO NO WEBHOOK:"
+    );
+
     console.log(erro.message);
   }
 }
-
-app.post(`/bot${TELEGRAM_TOKEN}`, async (req, res) => {
-  try {
-    bot.processUpdate(req.body);
-
-    res.sendStatus(200);
-  } catch (erro) {
-    console.log("ERRO WEBHOOK:");
-    console.log(erro.message);
-
-    res.sendStatus(500);
-  }
-});
 
 bot.on("message", async (msg) => {
   try {
     const chatId = msg.chat.id;
 
-    const texto = msg.text;
+    const texto =
+      msg.text?.trim();
 
     if (!texto) {
       return;
     }
 
-    console.log("BUSCANDO NO CACHE:");
-    console.log(texto);
-
-    const textoLimpo = texto.trim().toLowerCase();
+    const textoLower =
+      texto.toLowerCase();
 
     if (
-      textoLimpo === "oi" ||
-      textoLimpo === "olá" ||
-      textoLimpo === "ola" ||
-      textoLimpo === "bom dia" ||
-      textoLimpo === "boa tarde" ||
-      textoLimpo === "boa noite"
+      textoLower === "oi" ||
+      textoLower === "olá" ||
+      textoLower === "ola"
     ) {
       await bot.sendMessage(
         chatId,
-        "👋 Olá! Envie o nome de um time, campeonato ou país.\n\nExemplos:\n- Bahia\n- Brasileirão\n- Flamengo\n- Espanha"
+        `👋 Olá!\n\nEnvie:\n• Nome de time\n• Campeonato\n• País\n\nExemplos:\nBahia\nBrasileirão\nLa Liga\nChampions`
       );
 
       return;
     }
 
-    const jogos = buscarJogosPorTexto(texto);
+    const jogos =
+      buscarJogosPorTexto(texto);
 
     if (!jogos.length) {
       await bot.sendMessage(
         chatId,
-        `❌ Nenhum jogo encontrado para: ${texto}`
+        `❌ Nenhum jogo encontrado para:\n${texto}`
       );
 
       return;
     }
 
-    let mensagem = "";
+    let resposta =
+      `🔎 Busca: ${texto}\n`;
 
-    mensagem += `🔎 Busca: ${texto}\n`;
-    mensagem += `📊 Jogos encontrados: ${jogos.length}\n\n`;
+    resposta +=
+      `📊 Jogos encontrados: ${jogos.length}\n\n`;
 
-    const jogosLimitados = jogos.slice(0, 10);
+    const jogosLimitados =
+      jogos.slice(0, 10);
 
     for (const jogo of jogosLimitados) {
-      const oddCasa =
-        jogo.bookmakers?.[0]?.markets?.[0]?.outcomes?.[0]?.price;
 
-      const oddEmpate =
-        jogo.bookmakers?.[0]?.markets?.[0]?.outcomes?.[1]?.price;
-
-      const oddFora =
-        jogo.bookmakers?.[0]?.markets?.[0]?.outcomes?.[2]?.price;
-
-      if (!oddCasa || !oddEmpate || !oddFora) {
-        continue;
-      }
-
-      const analise = analisarJogo(jogo);
+      const analise =
+        analisarJogo(jogo);
 
       if (!analise) {
         continue;
       }
 
-      const data = new Date(jogo.commence_time);
+      const casa =
+        analise.casa;
 
-      const dataFormatada =
-        data.toLocaleString("pt-BR", {
-          timeZone: "America/Sao_Paulo"
-        });
+      const empate =
+        analise.empate;
 
-      mensagem += `
-🏆 ${jogo.sport_title.replace("Brazil", "Brasil")}
+      const fora =
+        analise.fora;
+
+      const data =
+        new Date(
+          jogo.commence_time
+        ).toLocaleString(
+          "pt-BR",
+          {
+            timeZone:
+              "America/Bahia"
+          }
+        );
+
+      const liga =
+        jogo.sport_title
+          ?.replace(
+            "Brazil",
+            "Brasil"
+          );
+
+      resposta +=
+`🏆 ${liga}
 
 ⚽ ${jogo.home_team} x ${jogo.away_team}
-🕒 ${dataFormatada}
+🕒 ${data}
 
-🏠 ${jogo.home_team}: ${oddCasa}
-📊 Chance estimada: ${(analise.probabilidades.casa * 100).toFixed(1)}%
-🎯 Odd justa: ${analise.oddsJustas.casa.toFixed(2)}
-💰 Valor esperado: ${analise.valorEsperado.casa.toFixed(1)}%
-${analise.classificacao.casa}
+🏠 ${jogo.home_team}: ${casa.odd}
+📊 Chance estimada: ${casa.probabilidade}%
+🎯 Odd justa: ${casa.oddJusta}
+💰 Valor esperado: ${casa.ev}%
+${textoEV(casa.ev)}
 
-🤝 Empate: ${oddEmpate}
-📊 Chance estimada: ${(analise.probabilidades.empate * 100).toFixed(1)}%
-🎯 Odd justa: ${analise.oddsJustas.empate.toFixed(2)}
-💰 Valor esperado: ${analise.valorEsperado.empate.toFixed(1)}%
-${analise.classificacao.empate}
+🤝 Empate: ${empate.odd}
+📊 Chance estimada: ${empate.probabilidade}%
+🎯 Odd justa: ${empate.oddJusta}
+💰 Valor esperado: ${empate.ev}%
+${textoEV(empate.ev)}
 
-✈️ ${jogo.away_team}: ${oddFora}
-📊 Chance estimada: ${(analise.probabilidades.fora * 100).toFixed(1)}%
-🎯 Odd justa: ${analise.oddsJustas.fora.toFixed(2)}
-💰 Valor esperado: ${analise.valorEsperado.fora.toFixed(1)}%
-${analise.classificacao.fora}
+✈️ ${jogo.away_team}: ${fora.odd}
+📊 Chance estimada: ${fora.probabilidade}%
+🎯 Odd justa: ${fora.oddJusta}
+💰 Valor esperado: ${fora.ev}%
+${textoEV(fora.ev)}
 
 ━━━━━━━━━━━━━━━
 
@@ -156,27 +170,76 @@ ${analise.classificacao.fora}
     }
 
     if (jogos.length > 10) {
-      mensagem += "⚠️ Mostrando apenas os 10 primeiros resultados.";
+      resposta +=
+        `⚠️ Mostrando apenas os 10 primeiros resultados.`;
     }
 
-    await bot.sendMessage(chatId, mensagem);
-  } catch (erro) {
-    console.log("ERRO NO BOT:");
+    await bot.sendMessage(
+      chatId,
+      resposta
+    );
+  }
+
+  catch (erro) {
+    console.log(
+      "ERRO NO BOT:"
+    );
+
     console.log(erro);
 
     await bot.sendMessage(
       msg.chat.id,
-      "❌ Ocorreu um erro ao processar sua busca."
+      "❌ Erro interno no sistema."
     );
   }
 });
 
-app.get("/", (req, res) => {
-  res.send("AnaliseBet IA online.");
-});
+function textoEV(ev) {
+  const valor =
+    Number(ev);
+
+  if (valor >= 15) {
+    return "🔥 Excelente valor";
+  }
+
+  if (valor >= 5) {
+    return "✅ Boa oportunidade";
+  }
+
+  return "❌ Sem valor";
+}
+
+async function iniciarSistema() {
+  try {
+    await atualizarCacheJogos();
+
+    setInterval(
+      atualizarCacheJogos,
+      1000 * 60 * 10
+    );
+
+    await iniciarWebhook();
+
+    console.log(
+      "Sistema iniciado"
+    );
+  }
+
+  catch (erro) {
+    console.log(
+      "ERRO INICIANDO SISTEMA:"
+    );
+
+    console.log(
+      erro.message
+    );
+  }
+}
 
 app.listen(PORT, async () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
+  console.log(
+    `Servidor rodando na porta ${PORT}`
+  );
 
   await iniciarSistema();
 });
