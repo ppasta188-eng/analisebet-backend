@@ -1,204 +1,102 @@
-import fs from "fs";
+let jogosCache = [];
 
-const CAMINHO_CACHE = "./cacheJogos.json";
+function salvarJogos(jogos) {
+  if (!Array.isArray(jogos)) return;
 
-/*
-====================================
-FUNÇÕES PRINCIPAIS
-====================================
-*/
-
-export function salvarCache(jogos) {
-  fs.writeFileSync(
-    CAMINHO_CACHE,
-    JSON.stringify(jogos, null, 2),
-    "utf-8"
-  );
-}
-
-export function carregarCache() {
-  if (!fs.existsSync(CAMINHO_CACHE)) {
-    return [];
+  if (jogos.length === 0) {
+    console.log("=======================");
+    console.log("CACHE MANTIDO");
+    console.log("API RETORNOU 0 JOGOS");
+    console.log("=======================");
+    return;
   }
 
-  const dados = fs.readFileSync(
-    CAMINHO_CACHE,
-    "utf-8"
-  );
+  jogosCache = jogos;
 
-  return JSON.parse(dados);
+  console.log("=======================");
+  console.log("CACHE SALVO:");
+  console.log(jogosCache.length);
+  console.log("=======================");
 }
 
-/*
-====================================
-NORMALIZAÇÃO
-====================================
-*/
+function obterJogos() {
+  return jogosCache;
+}
 
-function normalizarTexto(texto = "") {
+function normalizarTexto(texto) {
   return texto
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9\s]/g, "")
-    .trim();
+    ?.toLowerCase()
+    ?.normalize("NFD")
+    ?.replace(/[\u0300-\u036f]/g, "")
+    ?.trim();
 }
 
-/*
-====================================
-TERMOS DE BUSCA
-====================================
-*/
-
-function gerarTermosBusca(jogo) {
-  const termos = [];
-
-  const home = jogo.home_team || "";
-  const away = jogo.away_team || "";
-  const esporte = jogo.sport_title || "";
-  const key = jogo.sport_key || "";
-
-  termos.push(home);
-  termos.push(away);
-  termos.push(`${home} ${away}`);
-  termos.push(esporte);
-  termos.push(key);
-
-  /*
-  ============================
-  BRASILEIRÃO
-  ============================
-  */
-
-  if (key.includes("brazil_campeonato")) {
-    termos.push("brasileirao");
-    termos.push("brasileirão");
-    termos.push("serie a");
-    termos.push("série a");
-    termos.push("brasil serie a");
-    termos.push("campeonato brasileiro");
-  }
-
-  /*
-  ============================
-  SÉRIE B
-  ============================
-  */
-
-  if (key.includes("brazil_serie_b")) {
-    termos.push("serie b");
-    termos.push("série b");
-    termos.push("brasil serie b");
-  }
-
-  /*
-  ============================
-  LA LIGA
-  ============================
-  */
-
-  if (key.includes("spain_la_liga")) {
-    termos.push("la liga");
-    termos.push("laliga");
-    termos.push("espanhol");
-    termos.push("campeonato espanhol");
-  }
-
-  /*
-  ============================
-  ITALIANO
-  ============================
-  */
-
-  if (key.includes("italy_serie_a")) {
-    termos.push("italiano");
-    termos.push("serie a italia");
-    termos.push("campeonato italiano");
-  }
-
-  /*
-  ============================
-  BUNDESLIGA
-  ============================
-  */
-
-  if (key.includes("germany_bundesliga")) {
-    termos.push("bundesliga");
-    termos.push("alemao");
-    termos.push("alemão");
-    termos.push("campeonato alemao");
-  }
-
-  /*
-  ============================
-  FRANCÊS
-  ============================
-  */
-
-  if (key.includes("france_ligue_one")) {
-    termos.push("ligue 1");
-    termos.push("frances");
-    termos.push("francês");
-    termos.push("campeonato frances");
-  }
-
-  /*
-  ============================
-  CHAMPIONS
-  ============================
-  */
-
-  if (key.includes("champions")) {
-    termos.push("champions");
-    termos.push("liga dos campeoes");
-    termos.push("liga dos campeões");
-    termos.push("ucl");
-  }
-
-  return termos.map(normalizarTexto);
-}
-
-/*
-====================================
-BUSCA INTELIGENTE
-====================================
-*/
-
-export function buscarNoCache(textoBusca) {
-  const jogos = carregarCache();
-
-  const busca = normalizarTexto(textoBusca);
+function buscarJogosPorTexto(texto) {
+  const busca = normalizarTexto(texto);
 
   console.log("BUSCANDO NO CACHE:");
-  console.log(textoBusca);
+  console.log(texto);
 
-  return jogos.filter((jogo) => {
-    const termos = gerarTermosBusca(jogo);
+  return jogosCache.filter((jogo) => {
+    const home = normalizarTexto(jogo.home_team);
+    const away = normalizarTexto(jogo.away_team);
+    const esporte = normalizarTexto(jogo.sport_title);
 
-    return termos.some((termo) => {
-      return (
-        termo.includes(busca) ||
-        busca.includes(termo)
-      );
-    });
+    return (
+      home.includes(busca) ||
+      away.includes(busca) ||
+      esporte.includes(busca)
+    );
   });
 }
 
-/*
-====================================
-COMPATIBILIDADE TOTAL
-NÃO REMOVER
-====================================
-*/
+function formatarMensagemJogos(jogos) {
+  if (!jogos || jogos.length === 0) {
+    return "❌ Nenhum jogo encontrado.";
+  }
 
-export function buscarJogosPorTime(textoBusca) {
-  return buscarNoCache(textoBusca);
+  let mensagem = "";
+
+  jogos.slice(0, 10).forEach((jogo) => {
+    const bookmaker = jogo.bookmakers?.[0];
+
+    const market = bookmaker?.markets?.find(
+      (m) => m.key === "h2h"
+    );
+
+    const outcomes = market?.outcomes || [];
+
+    const homeOdd =
+      outcomes.find((o) => o.name === jogo.home_team)?.price || "-";
+
+    const awayOdd =
+      outcomes.find((o) => o.name === jogo.away_team)?.price || "-";
+
+    const drawOdd =
+      outcomes.find((o) => o.name === "Draw")?.price || "-";
+
+    mensagem += `⚽ ${jogo.home_team} x ${jogo.away_team}\n`;
+    mensagem += `🏆 ${jogo.sport_title}\n`;
+    mensagem += `🕒 ${new Date(jogo.commence_time).toLocaleString("pt-BR")}\n\n`;
+
+    mensagem += `ODDS:\n`;
+    mensagem += `🏠 ${jogo.home_team} → ${homeOdd}\n`;
+
+    if (drawOdd !== "-") {
+      mensagem += `🤝 Empate → ${drawOdd}\n`;
+    }
+
+    mensagem += `✈️ ${jogo.away_team} → ${awayOdd}\n`;
+
+    mensagem += `\n━━━━━━━━━━━━━━\n\n`;
+  });
+
+  return mensagem;
 }
 
-export function salvarJogos(jogos) {
-  return salvarCache(jogos);
-}
-
-export function carregarJogos() {
-  return carregarCache();
-}
+export {
+  salvarJogos,
+  obterJogos,
+  buscarJogosPorTexto,
+  formatarMensagemJogos,
+};
