@@ -9,6 +9,7 @@ const esportes = [
   "soccer_italy_serie_a",
   "soccer_germany_bundesliga",
   "soccer_france_ligue_one",
+  "soccer_uefa_champs_league",
   "basketball_nba"
 ];
 
@@ -18,6 +19,109 @@ function normalizarTexto(texto) {
     ?.normalize("NFD")
     ?.replace(/[\u0300-\u036f]/g, "")
     ?.trim();
+}
+
+function gerarTextoBusca(jogo) {
+  const sportKey = normalizarTexto(jogo.sport_key || "");
+
+  let aliases = [];
+
+  // Brasil
+  if (
+    sportKey.includes("brazil")
+  ) {
+    aliases.push(
+      "brasil",
+      "brasileirao",
+      "serie a",
+      "futebol brasileiro"
+    );
+  }
+
+  // Série B
+  if (
+    sportKey.includes("serie_b")
+  ) {
+    aliases.push(
+      "serie b",
+      "brasileirao serie b"
+    );
+  }
+
+  // Espanha
+  if (
+    sportKey.includes("la_liga")
+  ) {
+    aliases.push(
+      "la liga",
+      "espanha",
+      "campeonato espanhol"
+    );
+  }
+
+  // Alemanha
+  if (
+    sportKey.includes("bundesliga")
+  ) {
+    aliases.push(
+      "bundesliga",
+      "alemanha",
+      "campeonato alemao"
+    );
+  }
+
+  // Itália
+  if (
+    sportKey.includes("serie_a")
+  ) {
+    aliases.push(
+      "italia",
+      "serie a italiana",
+      "campeonato italiano"
+    );
+  }
+
+  // França
+  if (
+    sportKey.includes("ligue")
+  ) {
+    aliases.push(
+      "franca",
+      "ligue 1",
+      "campeonato frances"
+    );
+  }
+
+  // Champions
+  if (
+    sportKey.includes("champs")
+  ) {
+    aliases.push(
+      "champions",
+      "champions league",
+      "liga dos campeoes",
+      "uefa"
+    );
+  }
+
+  // NBA
+  if (
+    sportKey.includes("nba")
+  ) {
+    aliases.push(
+      "nba",
+      "basquete",
+      "basketball"
+    );
+  }
+
+  return normalizarTexto(`
+    ${jogo.home_team}
+    ${jogo.away_team}
+    ${jogo.sport_title}
+    ${jogo.sport_key}
+    ${aliases.join(" ")}
+  `);
 }
 
 export async function atualizarCacheJogos() {
@@ -93,19 +197,10 @@ export function buscarJogosPorTexto(texto) {
   const busca = normalizarTexto(texto);
 
   const resultados = cacheJogos.filter((jogo) => {
-    const casa = normalizarTexto(jogo.home_team);
+    const textoBusca =
+      gerarTextoBusca(jogo);
 
-    const fora = normalizarTexto(jogo.away_team);
-
-    const campeonato = normalizarTexto(
-      jogo.sport_title
-    );
-
-    return (
-      casa?.includes(busca) ||
-      fora?.includes(busca) ||
-      campeonato?.includes(busca)
-    );
+    return textoBusca.includes(busca);
   });
 
   return resultados;
