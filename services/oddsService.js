@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_KEY = process.env.ODDS_API_KEY;
+let cacheJogos = [];
 
 const esportes = [
   "soccer_brazil_campeonato",
@@ -12,8 +12,20 @@ const esportes = [
   "basketball_nba"
 ];
 
+function normalizarTexto(texto) {
+  return texto
+    ?.toLowerCase()
+    ?.normalize("NFD")
+    ?.replace(/[\u0300-\u036f]/g, "")
+    ?.trim();
+}
+
 export async function atualizarCacheJogos() {
   try {
+    console.log("=======================");
+    console.log("ATUALIZANDO CACHE...");
+    console.log("=======================");
+
     let todosJogos = [];
 
     for (const esporte of esportes) {
@@ -25,7 +37,7 @@ export async function atualizarCacheJogos() {
           `https://api.the-odds-api.com/v4/sports/${esporte}/odds`,
           {
             params: {
-              apiKey: API_KEY,
+              apiKey: process.env.ODDS_API_KEY,
               regions: "us",
               markets: "h2h",
               oddsFormat: "decimal"
@@ -37,24 +49,13 @@ export async function atualizarCacheJogos() {
 
         console.log(`ENCONTRADOS: ${jogos.length}`);
 
-        const jogosFormatados = jogos.map((jogo) => ({
-          home_team: jogo.home_team || "",
-          away_team: jogo.away_team || "",
-          league: jogo.sport_title || esporte,
-          commence_time: jogo.commence_time || "",
-          bookmakers: jogo.bookmakers || []
-        }));
-
-        todosJogos.push(...jogosFormatados);
-
-      } catch (error) {
+        todosJogos.push(...jogos);
+      } catch (erro) {
         console.log(`ERRO NO ESPORTE: ${esporte}`);
 
-        if (error.response?.data) {
-          console.log(error.response.data);
-        } else {
-          console.log(error.message);
-        }
+        console.log(
+          erro?.response?.data || erro.message
+        );
       }
     }
 
@@ -62,12 +63,50 @@ export async function atualizarCacheJogos() {
     console.log(`TOTAL FINAL: ${todosJogos.length}`);
     console.log("===============================");
 
-    return todosJogos;
+    if (todosJogos.length > 0) {
+      cacheJogos = todosJogos;
 
-  } catch (error) {
-    console.log("ERRO GERAL ODDS SERVICE:");
-    console.log(error.message);
+      console.log("=======================");
+      console.log("CACHE SALVO:");
+      console.log(cacheJogos.length);
+      console.log("=======================");
+    } else {
+      console.log("=======================");
+      console.log("CACHE MANTIDO");
+      console.log("API RETORNOU 0 JOGOS");
+      console.log("=======================");
+    }
 
-    return [];
+    return cacheJogos;
+  } catch (erro) {
+    console.log("ERRO ATUALIZANDO CACHE:");
+    console.log(erro.message);
+
+    return cacheJogos;
   }
+}
+
+export function buscarJogosPorTexto(texto) {
+  console.log("BUSCANDO NO CACHE:");
+  console.log(texto);
+
+  const busca = normalizarTexto(texto);
+
+  const resultados = cacheJogos.filter((jogo) => {
+    const casa = normalizarTexto(jogo.home_team);
+
+    const fora = normalizarTexto(jogo.away_team);
+
+    const campeonato = normalizarTexto(
+      jogo.sport_title
+    );
+
+    return (
+      casa?.includes(busca) ||
+      fora?.includes(busca) ||
+      campeonato?.includes(busca)
+    );
+  });
+
+  return resultados;
 }
