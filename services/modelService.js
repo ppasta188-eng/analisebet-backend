@@ -2,12 +2,44 @@ export function gerarProbabilidades(
   oddCasa,
   oddEmpate,
   oddFora,
-  forcaCasa = 0,
-  forcaFora = 0
+  forcaCasa = 50,
+  forcaFora = 50
 ) {
-  const probCasaBase = 1 / oddCasa;
-  const probEmpateBase = 1 / oddEmpate;
-  const probForaBase = 1 / oddFora;
+  oddCasa =
+    Number(oddCasa);
+
+  oddEmpate =
+    Number(oddEmpate);
+
+  oddFora =
+    Number(oddFora);
+
+  forcaCasa =
+    Number(forcaCasa);
+
+  forcaFora =
+    Number(forcaFora);
+
+  if (
+    isNaN(forcaCasa)
+  ) {
+    forcaCasa = 50;
+  }
+
+  if (
+    isNaN(forcaFora)
+  ) {
+    forcaFora = 50;
+  }
+
+  const probCasaBase =
+    1 / oddCasa;
+
+  const probEmpateBase =
+    1 / oddEmpate;
+
+  const probForaBase =
+    1 / oddFora;
 
   const somaBase =
     probCasaBase +
@@ -15,14 +47,17 @@ export function gerarProbabilidades(
     probForaBase;
 
   let probCasa =
-    probCasaBase / somaBase;
+    probCasaBase /
+    somaBase;
 
   let probFora =
-    probForaBase / somaBase;
+    probForaBase /
+    somaBase;
 
   const diferenca =
     Math.abs(
-      forcaCasa - forcaFora
+      forcaCasa -
+        forcaFora
     );
 
   let probEmpate = 0.28;
@@ -40,10 +75,15 @@ export function gerarProbabilidades(
   }
 
   const ajusteForca =
-    (forcaCasa - forcaFora) / 100;
+    (forcaCasa -
+      forcaFora) /
+    100;
 
-  probCasa += ajusteForca;
-  probFora -= ajusteForca;
+  probCasa +=
+    ajusteForca;
+
+  probFora -=
+    ajusteForca;
 
   if (probCasa < 0.05) {
     probCasa = 0.05;
@@ -59,19 +99,25 @@ export function gerarProbabilidades(
     probFora;
 
   probCasa =
-    probCasa / somaFinal;
+    probCasa /
+    somaFinal;
 
   probEmpate =
-    probEmpate / somaFinal;
+    probEmpate /
+    somaFinal;
 
   probFora =
-    probFora / somaFinal;
+    probFora /
+    somaFinal;
 
   return {
     casa: {
-      probabilidade: probCasa,
+      probabilidade:
+        probCasa,
+
       oddJusta:
         1 / probCasa,
+
       valorEsperado:
         oddCasa *
           probCasa -
@@ -81,8 +127,11 @@ export function gerarProbabilidades(
     empate: {
       probabilidade:
         probEmpate,
+
       oddJusta:
-        1 / probEmpate,
+        1 /
+        probEmpate,
+
       valorEsperado:
         oddEmpate *
           probEmpate -
@@ -92,8 +141,10 @@ export function gerarProbabilidades(
     fora: {
       probabilidade:
         probFora,
+
       oddJusta:
         1 / probFora,
+
       valorEsperado:
         oddFora *
           probFora -
