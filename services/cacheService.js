@@ -1,84 +1,21 @@
-import axios from "axios";
-
-const API_KEY = process.env.ODDS_API_KEY;
-
-export let cacheJogos = [];
-
-const esportes = [
-  "soccer_brazil_campeonato",
-  "soccer_brazil_serie_b",
-  "soccer_spain_la_liga",
-  "soccer_italy_serie_a",
-  "soccer_germany_bundesliga",
-  "soccer_france_ligue_one",
-  "soccer_uefa_champs_league",
-  "basketball_nba"
-];
-
-function normalizarTexto(texto = "") {
-  return texto
-    .toString()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim();
-}
-
-function formatarJogo(jogo) {
-  const bookmaker = jogo.bookmakers?.[0];
-
-  const market = bookmaker?.markets?.find(
-    (m) => m.key === "h2h"
-  );
-
-  const outcomes = market?.outcomes || [];
-
-  const oddCasa =
-    outcomes.find(
-      (o) => o.name === jogo.home_team
-    )?.price || null;
-
-  const oddFora =
-    outcomes.find(
-      (o) => o.name === jogo.away_team
-    )?.price || null;
-
-  const oddEmpate =
-    outcomes.find(
-      (o) =>
-        o.name === "Draw" ||
-        o.name === "Empate"
-    )?.price || null;
-
-  return {
-    id: jogo.id,
-
-    esporte: jogo.sport_key,
-
-    campeonato: jogo.sport_title
-      ?.replace("Brazil", "Brasil"),
-
-    casa: jogo.home_team,
-
-    fora: jogo.away_team,
-
-    data: jogo.commence_time,
-
-    odds: {
-      casa: oddCasa,
-      empate: oddEmpate,
-      fora: oddFora
-    }
-  };
-}
-
 export async function atualizarCache() {
   try {
     console.log("=======================");
     console.log("ATUALIZANDO CACHE...");
     console.log("=======================");
 
-    let jogos = [];
+    const esportes = [
+      "soccer_brazil_campeonato",
+      "soccer_brazil_serie_b",
+      "soccer_spain_la_liga",
+      "soccer_italy_serie_a",
+      "soccer_germany_bundesliga",
+      "soccer_france_ligue_one",
+      "soccer_uefa_champs_league",
+      "basketball_nba"
+    ];
+
+    let todosJogos = [];
 
     for (const esporte of esportes) {
       try {
@@ -89,59 +26,108 @@ export async function atualizarCache() {
           `https://api.the-odds-api.com/v4/sports/${esporte}/odds`,
           {
             params: {
-              apiKey: API_KEY,
-              regions: "us,uk,eu",
+              apiKey: process.env.ODDS_API_KEY,
+              regions: "us,uk,eu,br",
               markets: "h2h",
               oddsFormat: "decimal"
             }
           }
         );
 
-        console.log(
-          `ENCONTRADOS: ${response.data.length}`
-        );
+        const jogos = response.data || [];
 
-        const jogosFormatados =
-          response.data.map(formatarJogo);
+        console.log(`ENCONTRADOS: ${jogos.length}`);
 
-        jogos.push(...jogosFormatados);
-      } catch (erroEsporte) {
+        for (const jogo of jogos) {
+          try {
+            const bookmaker =
+              jogo.bookmakers?.[0];
+
+            const market =
+              bookmaker?.markets?.[0];
+
+            const outcomes =
+              market?.outcomes || [];
+
+            const casa = outcomes.find(
+              o => o.name === jogo.home_team
+            );
+
+            const fora = outcomes.find(
+              o => o.name !== jogo.home_team &&
+              o.name.toLowerCase() !== "draw"
+            );
+
+            const empate = outcomes.find(
+              o =>
+                o.name.toLowerCase() === "draw"
+            );
+
+            todosJogos.push({
+              esporte,
+
+              liga:
+                jogo.sport_title,
+
+              casa:
+                jogo.home_team,
+
+              fora:
+                jogo.away_team,
+
+              horario:
+                jogo.commence_time,
+
+              odds: {
+                casa: casa?.price || null,
+                empate: empate?.price || null,
+                fora: fora?.price || null
+              }
+            });
+          } catch (erroJogo) {
+            console.log(
+              "ERRO AO PROCESSAR JOGO"
+            );
+
+            console.log(erroJogo.message);
+          }
+        }
+      } catch (erro) {
         console.log(
           `ERRO AO CONSULTAR ${esporte}`
         );
 
-        console.log(erroEsporte.message);
+        console.log(erro.message);
       }
     }
 
-    cacheJogos = jogos;
-
     console.log("===============================");
-    console.log(`TOTAL FINAL: ${cacheJogos.length}`);
+    console.log(
+      `TOTAL FINAL: ${todosJogos.length}`
+    );
     console.log("===============================");
 
-    console.log("=======================");
-    console.log("CACHE SALVO:");
-    console.log(cacheJogos.length);
-    console.log("=======================");
+    // PROTEÇÃO DO CACHE
+    if (todosJogos.length > 0) {
+      cacheJogos = todosJogos;
+
+      console.log("=======================");
+      console.log("CACHE SALVO:");
+      console.log(cacheJogos.length);
+      console.log("=======================");
+    } else {
+      console.log("=======================");
+      console.log("CACHE NÃO ATUALIZADO");
+      console.log(
+        "Mantendo último cache válido"
+      );
+      console.log("=======================");
+    }
   } catch (erro) {
-    console.log("ERRO NO CACHE:");
+    console.log(
+      "ERRO GERAL AO ATUALIZAR CACHE"
+    );
+
     console.log(erro.message);
   }
-}
-
-export function buscarJogosPorTexto(textoBusca) {
-  console.log("BUSCANDO NO CACHE:");
-  console.log(textoBusca);
-
-  const termo = normalizarTexto(textoBusca);
-
-  return cacheJogos.filter((jogo) => {
-    return (
-      normalizarTexto(jogo.casa).includes(termo) ||
-      normalizarTexto(jogo.fora).includes(termo) ||
-      normalizarTexto(jogo.campeonato).includes(termo) ||
-      normalizarTexto(jogo.esporte).includes(termo)
-    );
-  });
 }
