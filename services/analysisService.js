@@ -1,14 +1,48 @@
 export function analisarJogo(odds) {
-  const oddCasa = Number(odds?.casa);
-  const oddEmpate = Number(odds?.empate);
-  const oddFora = Number(odds?.fora);
+  const oddCasa = Number(
+    odds?.casa ??
+    odds?.home ??
+    odds?.homeOdd
+  );
+
+  const oddEmpate = Number(
+    odds?.empate ??
+    odds?.draw ??
+    odds?.drawOdd
+  );
+
+  const oddFora = Number(
+    odds?.fora ??
+    odds?.away ??
+    odds?.awayOdd
+  );
 
   if (
-    !oddCasa ||
-    !oddEmpate ||
-    !oddFora
+    isNaN(oddCasa) ||
+    isNaN(oddEmpate) ||
+    isNaN(oddFora)
   ) {
-    return null;
+    console.log("ERRO ODDS:", odds);
+
+    return {
+      casa: {
+        probabilidade: "-",
+        oddJusta: "-",
+        ev: "-"
+      },
+
+      empate: {
+        probabilidade: "-",
+        oddJusta: "-",
+        ev: "-"
+      },
+
+      fora: {
+        probabilidade: "-",
+        oddJusta: "-",
+        ev: "-"
+      }
+    };
   }
 
   // Probabilidades implícitas
@@ -16,13 +50,12 @@ export function analisarJogo(odds) {
   const probEmpateBruta = 1 / oddEmpate;
   const probForaBruta = 1 / oddFora;
 
-  // Soma das probabilidades
   const soma =
     probCasaBruta +
     probEmpateBruta +
     probForaBruta;
 
-  // Remoção da margem da casa
+  // Remoção da margem
   const probCasa =
     (probCasaBruta / soma) * 100;
 
