@@ -47,6 +47,18 @@ export async function atualizarCache() {
 
       if (error.response?.data) {
         console.log(error.response.data);
+
+        if (
+          error.response.data.error_code ===
+          "OUT_OF_USAGE_CREDITS"
+        ) {
+          console.log("=======================");
+          console.log("LIMITE DA API ATINGIDO");
+          console.log("INTERROMPENDO CONSULTAS");
+          console.log("=======================");
+
+          break;
+        }
       } else {
         console.log(error.message);
       }
@@ -89,7 +101,10 @@ export function buscarJogosPorTexto(texto) {
     return [];
   }
 
-  const busca = texto.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const busca = texto
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 
   return jogosCache.filter((jogo) => {
     const home = jogo.home_team
