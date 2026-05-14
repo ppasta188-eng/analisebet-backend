@@ -42,16 +42,16 @@ export async function atualizarCache() {
       console.log(`ENCONTRADOS: ${jogos.length}`);
 
       todosJogos.push(...jogos);
+
     } catch (error) {
       console.log(`ERRO AO CONSULTAR ${esporte}`);
 
-      if (error.response?.data) {
-        console.log(error.response.data);
+      const erroApi = error.response?.data;
 
-        if (
-          error.response.data.error_code ===
-          "OUT_OF_USAGE_CREDITS"
-        ) {
+      if (erroApi) {
+        console.log(erroApi);
+
+        if (erroApi.error_code === "OUT_OF_USAGE_CREDITS") {
           console.log("=======================");
           console.log("LIMITE DA API ATINGIDO");
           console.log("INTERROMPENDO CONSULTAS");
