@@ -1,4 +1,4 @@
-export function analisarOdds(odds) {
+export function analisarJogo(odds) {
   const oddCasa = Number(odds?.casa);
   const oddEmpate = Number(odds?.empate);
   const oddFora = Number(odds?.fora);
@@ -11,15 +11,18 @@ export function analisarOdds(odds) {
     return null;
   }
 
+  // Probabilidades implícitas
   const probCasaBruta = 1 / oddCasa;
   const probEmpateBruta = 1 / oddEmpate;
   const probForaBruta = 1 / oddFora;
 
+  // Soma das probabilidades
   const soma =
     probCasaBruta +
     probEmpateBruta +
     probForaBruta;
 
+  // Remoção da margem da casa
   const probCasa =
     (probCasaBruta / soma) * 100;
 
@@ -29,6 +32,7 @@ export function analisarOdds(odds) {
   const probFora =
     (probForaBruta / soma) * 100;
 
+  // Odds justas
   const oddJustaCasa =
     100 / probCasa;
 
@@ -38,6 +42,7 @@ export function analisarOdds(odds) {
   const oddJustaFora =
     100 / probFora;
 
+  // EV
   const evCasa =
     ((oddCasa / oddJustaCasa) - 1) * 100;
 
