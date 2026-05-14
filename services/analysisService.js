@@ -1,107 +1,146 @@
-export function analisarJogo(odds) {
-  const oddCasa = Number(
-    odds?.casa ??
-    odds?.home ??
-    odds?.homeOdd
-  );
+import axios from "axios";
 
-  const oddEmpate = Number(
-    odds?.empate ??
-    odds?.draw ??
-    odds?.drawOdd
-  );
+const API_FOOTBALL_KEY = process.env.API_FOOTBALL_KEY;
 
-  const oddFora = Number(
-    odds?.fora ??
-    odds?.away ??
-    odds?.awayOdd
-  );
-
-  if (
-    isNaN(oddCasa) ||
-    isNaN(oddEmpate) ||
-    isNaN(oddFora)
-  ) {
-    console.log("ERRO ODDS:", odds);
-
-    return {
-      casa: {
-        probabilidade: "-",
-        oddJusta: "-",
-        ev: "-"
-      },
-
-      empate: {
-        probabilidade: "-",
-        oddJusta: "-",
-        ev: "-"
-      },
-
-      fora: {
-        probabilidade: "-",
-        oddJusta: "-",
-        ev: "-"
-      }
-    };
+function calcularOddJusta(probabilidade) {
+  if (!probabilidade || probabilidade <= 0) {
+    return null;
   }
 
-  // Probabilidades implícitas
-  const probCasaBruta = 1 / oddCasa;
-  const probEmpateBruta = 1 / oddEmpate;
-  const probForaBruta = 1 / oddFora;
+  return (1 / probabilidade).toFixed(2);
+}
 
-  const soma =
-    probCasaBruta +
-    probEmpateBruta +
-    probForaBruta;
+function calcularEV(probabilidade, odd) {
+  if (!probabilidade || !odd) {
+    return null;
+  }
 
-  // Remoção da margem
-  const probCasa =
-    (probCasaBruta / soma) * 100;
+  return (((probabilidade * odd) - 1) * 100).toFixed(2);
+}
 
-  const probEmpate =
-    (probEmpateBruta / soma) * 100;
+function formatarPorcentagem(valor) {
+  if (valor === null || valor === undefined || isNaN(valor)) {
+    return "-";
+  }
 
-  const probFora =
-    (probForaBruta / soma) * 100;
+  return `${(valor * 100).toFixed(2)}%`;
+}
 
-  // Odds justas
-  const oddJustaCasa =
-    100 / probCasa;
+async function buscarEstatisticasAPIFootball(homeTeam, awayTeam) {
+  try {
+    const response = await axios.get(
+      "https://v3.football.api-sports.io/teams",
+      {
+        headers: {
+          "x-apisports-key": API_FOOTBALL_KEY
+        },
+        params: {
+          search: homeTeam
+        }
+      }
+    );
 
-  const oddJustaEmpate =
-    100 / probEmpate;
+    const homeEncontrado =
+      response.data?.response &&
+      response.data.response.length > 0;
 
-  const oddJustaFora =
-    100 / probFora;
+    const responseAway = await axios.get(
+      "https://v3.football.api-sports.io/teams",
+      {
+        headers: {
+          "x-apisports-key": API_FOOTBALL_KEY
+        },
+        params: {
+          search: awayTeam
+        }
+      }
+    );
 
-  // EV
-  const evCasa =
-    ((oddCasa / oddJustaCasa) - 1) * 100;
+    const awayEncontrado =
+      responseAway.data?.response &&
+      responseAway.data.response.length > 0;
 
-  const evEmpate =
-    ((oddEmpate / oddJustaEmpate) - 1) * 100;
+    if (!homeEncontrado || !awayEncontrado) {
+      return null;
+    }
 
-  const evFora =
-    ((oddFora / oddJustaFora) - 1) * 100;
+    return {
+      homeStrength: 0.45,
+      drawStrength: 0.27,
+      awayStrength: 0.28
+    };
+  } catch (error) {
+    console.log("=======================");
+    console.log("ERRO API-FOOTBALL");
+    console.log(error.response?.data || error.message);
+    console.log("=======================");
+
+    return null;
+  }
+}
+
+export async function analisarJogo(jogo) {
+  const homeOdd = jogo.bookmakers?.[0]?.markets?.[0]?.outcomes?.find(
+    o => o.name === jogo.home_team
+  )?.price;
+
+  const awayOdd = jogo.bookmakers?.[0]?.markets?.[0]?.outcomes?.find(
+    o => o.name === jogo.away_team
+  )?.price;
+
+  const drawOdd = jogo.bookmakers?.[0]?.markets?.[0]?.outcomes?.find(
+    o => o.name.toLowerCase() === "draw"
+  )?.price;
+
+  let homeProbability = null;
+  let drawProbability = null;
+  let awayProbability = null;
+
+  const estatisticas = await buscarEstatisticasAPIFootball(
+    jogo.home_team,
+    jogo.away_team
+  );
+
+  if (estatisticas) {
+    homeProbability = estatisticas.homeStrength;
+    drawProbability = estatisticas.drawStrength;
+    awayProbability = estatisticas.awayStrength;
+  }
+
+  const homeFairOdd = calcularOddJusta(homeProbability);
+  const drawFairOdd = calcularOddJusta(drawProbability);
+  const awayFairOdd = calcularOddJusta(awayProbability);
+
+  const homeEV = calcularEV(homeProbability, homeOdd);
+  const drawEV = calcularEV(drawProbability, drawOdd);
+  const awayEV = calcularEV(awayProbability, awayOdd);
 
   return {
-    casa: {
-      probabilidade: probCasa.toFixed(1),
-      oddJusta: oddJustaCasa.toFixed(2),
-      ev: evCasa.toFixed(1)
+    home: {
+      odd: homeOdd,
+      probability: formatarPorcentagem(homeProbability),
+      fairOdd: homeFairOdd || "-",
+      ev: homeEV ? `${homeEV}%` : "-",
+      value:
+        homeEV && Number(homeEV) > 0
     },
 
-    empate: {
-      probabilidade: probEmpate.toFixed(1),
-      oddJusta: oddJustaEmpate.toFixed(2),
-      ev: evEmpate.toFixed(1)
+    draw: {
+      odd: drawOdd,
+      probability: formatarPorcentagem(drawProbability),
+      fairOdd: drawFairOdd || "-",
+      ev: drawEV ? `${drawEV}%` : "-",
+      value:
+        drawEV && Number(drawEV) > 0
     },
 
-    fora: {
-      probabilidade: probFora.toFixed(1),
-      oddJusta: oddJustaFora.toFixed(2),
-      ev: evFora.toFixed(1)
+    away: {
+      odd: awayOdd,
+      probability: formatarPorcentagem(awayProbability),
+      fairOdd: awayFairOdd || "-",
+      ev: awayEV ? `${awayEV}%` : "-",
+      value:
+        awayEV && Number(awayEV) > 0
     }
   };
 }
