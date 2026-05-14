@@ -1,3 +1,7 @@
+import axios from "axios";
+
+let cacheJogos = [];
+
 export async function atualizarCache() {
   try {
     console.log("=======================");
@@ -54,8 +58,9 @@ export async function atualizarCache() {
             );
 
             const fora = outcomes.find(
-              o => o.name !== jogo.home_team &&
-              o.name.toLowerCase() !== "draw"
+              o =>
+                o.name !== jogo.home_team &&
+                o.name.toLowerCase() !== "draw"
             );
 
             const empate = outcomes.find(
@@ -89,7 +94,9 @@ export async function atualizarCache() {
               "ERRO AO PROCESSAR JOGO"
             );
 
-            console.log(erroJogo.message);
+            console.log(
+              erroJogo.message
+            );
           }
         }
       } catch (erro) {
@@ -107,7 +114,7 @@ export async function atualizarCache() {
     );
     console.log("===============================");
 
-    // PROTEÇÃO DO CACHE
+    // NÃO SOBRESCREVER CACHE VÁLIDO
     if (todosJogos.length > 0) {
       cacheJogos = todosJogos;
 
@@ -130,4 +137,42 @@ export async function atualizarCache() {
 
     console.log(erro.message);
   }
+}
+
+export function getCacheJogos() {
+  return cacheJogos;
+}
+
+export function buscarJogosPorTexto(texto) {
+  if (!texto) {
+    return [];
+  }
+
+  const busca = texto
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+  return cacheJogos.filter(jogo => {
+    const casa = jogo.casa
+      ?.toLowerCase()
+      ?.normalize("NFD")
+      ?.replace(/[\u0300-\u036f]/g, "");
+
+    const fora = jogo.fora
+      ?.toLowerCase()
+      ?.normalize("NFD")
+      ?.replace(/[\u0300-\u036f]/g, "");
+
+    const liga = jogo.liga
+      ?.toLowerCase()
+      ?.normalize("NFD")
+      ?.replace(/[\u0300-\u036f]/g, "");
+
+    return (
+      casa?.includes(busca) ||
+      fora?.includes(busca) ||
+      liga?.includes(busca)
+    );
+  });
 }
