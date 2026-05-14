@@ -1,7 +1,8 @@
 import axios from "axios";
 
+const ODDS_API_KEY = process.env.ODDS_API_KEY;
+
 let jogosCache = [];
-let ultimoCacheValido = [];
 
 const esportes = [
   "soccer_brazil_campeonato",
@@ -19,39 +20,41 @@ export async function atualizarCache() {
   console.log("ATUALIZANDO CACHE...");
   console.log("=======================");
 
-  const todosJogos = [];
+  const novosJogos = [];
 
   for (const esporte of esportes) {
     try {
       console.log("===============================");
       console.log(`CONSULTANDO: ${esporte}`);
 
-      const url = `https://api.the-odds-api.com/v4/sports/${esporte}/odds`;
-
-      const response = await axios.get(url, {
-        params: {
-          apiKey: process.env.ODDS_API_KEY,
-          regions: "us,uk,eu",
-          markets: "h2h",
-          oddsFormat: "decimal"
+      const response = await axios.get(
+        `https://api.the-odds-api.com/v4/sports/${esporte}/odds`,
+        {
+          params: {
+            apiKey: ODDS_API_KEY,
+            regions: "us",
+            markets: "h2h",
+            oddsFormat: "decimal"
+          }
         }
-      });
+      );
 
       const jogos = response.data || [];
 
       console.log(`ENCONTRADOS: ${jogos.length}`);
 
-      todosJogos.push(...jogos);
+      novosJogos.push(...jogos);
 
     } catch (error) {
       console.log(`ERRO AO CONSULTAR ${esporte}`);
 
-      const erroApi = error.response?.data;
+      if (error.response?.data) {
+        console.log(error.response.data);
 
-      if (erroApi) {
-        console.log(erroApi);
-
-        if (erroApi.error_code === "OUT_OF_USAGE_CREDITS") {
+        if (
+          error.response.data.error_code ===
+          "OUT_OF_USAGE_CREDITS"
+        ) {
           console.log("=======================");
           console.log("LIMITE DA API ATINGIDO");
           console.log("INTERROMPENDO CONSULTAS");
@@ -66,12 +69,11 @@ export async function atualizarCache() {
   }
 
   console.log("===============================");
-  console.log(`TOTAL FINAL: ${todosJogos.length}`);
+  console.log(`TOTAL FINAL: ${novosJogos.length}`);
   console.log("===============================");
 
-  if (todosJogos.length > 0) {
-    jogosCache = todosJogos;
-    ultimoCacheValido = todosJogos;
+  if (novosJogos.length > 0) {
+    jogosCache = novosJogos;
 
     console.log("=======================");
     console.log("CACHE SALVO:");
@@ -82,15 +84,7 @@ export async function atualizarCache() {
     console.log("CACHE NÃO ATUALIZADO");
     console.log("Mantendo último cache válido");
     console.log("=======================");
-
-    jogosCache = ultimoCacheValido;
   }
-
-  return jogosCache;
-}
-
-export function obterCache() {
-  return jogosCache;
 }
 
 export function buscarJogosPorTexto(texto) {
