@@ -1,8 +1,11 @@
 import axios from "axios";
+import fs from "fs";
 
 const ODDS_API_KEY = process.env.ODDS_API_KEY;
 
-let jogosCache = [];
+const CACHE_FILE = "./cache.json";
+
+let jogosCache = carregarCache();
 
 const esportes = [
   "soccer_brazil_campeonato",
@@ -14,6 +17,55 @@ const esportes = [
   "soccer_uefa_champs_league",
   "basketball_nba"
 ];
+
+function salvarCache(jogos) {
+  try {
+    fs.writeFileSync(
+      CACHE_FILE,
+      JSON.stringify(jogos, null, 2),
+      "utf-8"
+    );
+
+    console.log("=======================");
+    console.log("CACHE SALVO EM ARQUIVO");
+    console.log(jogos.length);
+    console.log("=======================");
+  } catch (error) {
+    console.log("=======================");
+    console.log("ERRO AO SALVAR CACHE");
+    console.log(error.message);
+    console.log("=======================");
+  }
+}
+
+function carregarCache() {
+  try {
+    if (fs.existsSync(CACHE_FILE)) {
+      const dados = fs.readFileSync(
+        CACHE_FILE,
+        "utf-8"
+      );
+
+      const jogos = JSON.parse(dados);
+
+      if (Array.isArray(jogos)) {
+        console.log("=======================");
+        console.log("CACHE CARREGADO");
+        console.log(jogos.length);
+        console.log("=======================");
+
+        return jogos;
+      }
+    }
+  } catch (error) {
+    console.log("=======================");
+    console.log("ERRO AO CARREGAR CACHE");
+    console.log(error.message);
+    console.log("=======================");
+  }
+
+  return [];
+}
 
 export async function atualizarCache() {
   console.log("=======================");
@@ -75,8 +127,10 @@ export async function atualizarCache() {
   if (novosJogos.length > 0) {
     jogosCache = novosJogos;
 
+    salvarCache(jogosCache);
+
     console.log("=======================");
-    console.log("CACHE SALVO:");
+    console.log("CACHE ATUALIZADO");
     console.log(jogosCache.length);
     console.log("=======================");
   } else {
